@@ -7,6 +7,7 @@ const API_BASE = 'http://localhost:8000/api/v1';
 // State
 let devices = [];
 let alertRules = [];
+let users = [];
 
 // DOM elements
 const deviceForm = document.getElementById('device-form');
@@ -14,6 +15,7 @@ const alertForm = document.getElementById('alert-form');
 const devicesList = document.getElementById('devices-list');
 const alertsList = document.getElementById('alerts-list');
 const alertDeviceSelect = document.getElementById('alert-device');
+const usersList = document.getElementById('users-list');
 
 // Toast notification
 function showToast(message, isError = false) {
@@ -121,6 +123,60 @@ async function fetchAlertRules() {
     }
 }
 
+// Render users list
+function renderUsers() {
+    if (users.length === 0) {
+        usersList.innerHTML = '<p class="empty-state">No users registered yet.</p>';
+        return;
+    }
+    
+    usersList.innerHTML = users.map(user => `
+        <div class="list-item">
+            <div>
+                <div class="name">${user.email}</div>
+                <div class="meta">${user.full_name || 'No name'} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${user.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+                <button class="delete-btn" onclick="deleteUser(${user.id}, '${user.email}')" title="Delete user">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Fetch users from API
+async function fetchUsers() {
+    try {
+        const response = await fetch(`${API_BASE}/users`);
+        if (response.ok) {
+            users = await response.json();
+            renderUsers();
+        }
+    } catch (error) {
+        console.error('Failed to fetch users:', error);
+        users = [];
+        renderUsers();
+    }
+}
+
+// Delete a user
+function deleteUser(userId, userEmail) {
+    pendingDeleteUserId = userId;
+    pendingDeleteUserEmail = userEmail;
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+    
+    // Update modal text for user deletion
+    document.querySelector('.modal-title').textContent = 'Delete User?';
+    document.querySelector('.modal-message').textContent = 
+        `Are you sure you want to delete "${userEmail}"? This cannot be undone.`;
+    
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+let pendingDeleteUserId = null;
+let pendingDeleteUserEmail = null;
+
 // Handle device registration
 deviceForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -210,6 +266,7 @@ alertForm.addEventListener('submit', async (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     fetchDevices();
     fetchAlertRules();
+    fetchUsers();
 });
 
 // Delete an alert rule
@@ -284,6 +341,25 @@ async function handleConfirm() {
             renderAlertRules();
             showToast('Alert rule deleted (demo mode)');
         }
+    } else if (pendingDeleteUserId) {
+        // Delete user
+        try {
+            const response = await fetch(`${API_BASE}/users/${pendingDeleteUserId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('User deleted successfully!');
+                await fetchUsers();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete user', true);
+            }
+        } catch (error) {
+            users = users.filter(u => u.id !== pendingDeleteUserId);
+            renderUsers();
+            showToast('User deleted (demo mode)');
+        }
     } else if (pendingDeleteDeviceId) {
         // Delete device
         try {
@@ -309,5 +385,7 @@ async function handleConfirm() {
     pendingDeleteDeviceId = null;
     pendingDeleteRuleId = null;
     pendingDeleteDeviceName = null;
+    pendingDeleteUserId = null;
+    pendingDeleteUserEmail = null;
 }
 document.getElementById('modal-confirm').addEventListener('click', handleConfirm);
