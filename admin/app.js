@@ -7,6 +7,7 @@ const API_BASE = 'http://localhost:8000/api/v1';
 // State
 let devices = [];
 let alertRules = [];
+let users = [];
 
 // DOM elements
 const deviceForm = document.getElementById('device-form');
@@ -14,6 +15,7 @@ const alertForm = document.getElementById('alert-form');
 const devicesList = document.getElementById('devices-list');
 const alertsList = document.getElementById('alerts-list');
 const alertDeviceSelect = document.getElementById('alert-device');
+const usersList = document.getElementById('users-list');
 
 // Toast notification
 function showToast(message, isError = false) {
@@ -41,7 +43,10 @@ function renderDevices() {
                 <div class="name">${device.name}</div>
                 <div class="meta">${device.device_id}</div>
             </div>
-            <div class="meta">${device.is_active ? '🟢 Active' : '⚪ Inactive'}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${device.is_active ? '🟢 Active' : '⚪ Inactive'}</span>
+                <button class="delete-btn" onclick="deleteDevice(${device.id}, '${device.name}')" title="Delete device">🗑️</button>
+            </div>
         </div>
     `).join('');
     
@@ -61,10 +66,13 @@ function renderAlertRules() {
     alertsList.innerHTML = alertRules.map(rule => `
         <div class="list-item">
             <div>
-                <div class="name">Device: ${rule.device_id}</div>
+                <div class="name">${rule.device_name || `Device #${rule.device_id}`}</div>
                 <div class="meta">${rule.temp_min}°C – ${rule.temp_max}°C</div>
             </div>
-            <div class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</span>
+                <button class="delete-btn" onclick="deleteRule(${rule.device_id}, ${rule.id})" title="Delete rule">🗑️</button>
+            </div>
         </div>
     `).join('');
 }
@@ -87,21 +95,87 @@ async function fetchDevices() {
     }
 }
 
-// Fetch alert rules from API
+// Fetch alert rules from API (for all devices)
 async function fetchAlertRules() {
     try {
-        const response = await fetch(`${API_BASE}/rules`);
-        if (response.ok) {
-            alertRules = await response.json();
-            renderAlertRules();
+        // Alert rules are per-device, so we need to fetch for each device
+        alertRules = [];
+        for (const device of devices) {
+            try {
+                const response = await fetch(`${API_BASE}/devices/${device.id}/rules`);
+                if (response.ok) {
+                    const rules = await response.json();
+                    // Add device name to each rule for display
+                    rules.forEach(rule => {
+                        rule.device_name = device.name;
+                    });
+                    alertRules = alertRules.concat(rules);
+                }
+            } catch (e) {
+                console.error(`Failed to fetch rules for device ${device.id}:`, e);
+            }
         }
+        renderAlertRules();
     } catch (error) {
         console.error('Failed to fetch alert rules:', error);
-        // Use mock data for demo
         alertRules = [];
         renderAlertRules();
     }
 }
+
+// Render users list
+function renderUsers() {
+    if (users.length === 0) {
+        usersList.innerHTML = '<p class="empty-state">No users registered yet.</p>';
+        return;
+    }
+    
+    usersList.innerHTML = users.map(user => `
+        <div class="list-item">
+            <div>
+                <div class="name">${user.email}</div>
+                <div class="meta">${user.full_name || 'No name'} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${user.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+                <button class="delete-btn" onclick="deleteUser(${user.id}, '${user.email}')" title="Delete user">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Fetch users from API
+async function fetchUsers() {
+    try {
+        const response = await fetch(`${API_BASE}/users`);
+        if (response.ok) {
+            users = await response.json();
+            renderUsers();
+        }
+    } catch (error) {
+        console.error('Failed to fetch users:', error);
+        users = [];
+        renderUsers();
+    }
+}
+
+// Delete a user
+function deleteUser(userId, userEmail) {
+    pendingDeleteUserId = userId;
+    pendingDeleteUserEmail = userEmail;
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+    
+    // Update modal text for user deletion
+    document.querySelector('.modal-title').textContent = 'Delete User?';
+    document.querySelector('.modal-message').textContent = 
+        `Are you sure you want to delete "${userEmail}"? This cannot be undone.`;
+    
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+let pendingDeleteUserId = null;
+let pendingDeleteUserEmail = null;
 
 // Handle device registration
 deviceForm.addEventListener('submit', async (e) => {
@@ -192,4 +266,126 @@ alertForm.addEventListener('submit', async (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     fetchDevices();
     fetchAlertRules();
+    fetchUsers();
 });
+
+// Delete an alert rule
+let pendingDeleteDeviceId = null;
+let pendingDeleteRuleId = null;
+
+function deleteRule(deviceId, ruleId) {
+    pendingDeleteDeviceId = deviceId;
+    pendingDeleteRuleId = ruleId;
+    
+    // Update modal text for rule deletion
+    document.querySelector('.modal-title').textContent = 'Delete Alert Rule?';
+    document.querySelector('.modal-message').textContent = 'This action cannot be undone.';
+    
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+// Modal event handlers
+document.getElementById('modal-cancel').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+});
+
+// Close modal on overlay click
+document.getElementById('confirm-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'confirm-modal') {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        pendingDeleteDeviceId = null;
+        pendingDeleteRuleId = null;
+        pendingDeleteDeviceName = null;
+    }
+});
+
+// Delete a device
+let pendingDeleteDeviceName = null;
+
+function deleteDevice(deviceId, deviceName) {
+    pendingDeleteDeviceId = deviceId;
+    pendingDeleteDeviceName = deviceName;
+    pendingDeleteRuleId = null; // Not deleting a rule
+    
+    // Update modal text
+    document.querySelector('.modal-title').textContent = 'Delete Device?';
+    document.querySelector('.modal-message').textContent = 
+        `Are you sure you want to delete "${deviceName}"? All telemetry data and alert rules will also be deleted.`;
+    
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+// Override confirm click to handle both device and rule deletion
+document.getElementById('modal-confirm').removeEventListener('click', handleConfirm);
+async function handleConfirm() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    
+    if (pendingDeleteRuleId) {
+        // Delete rule
+        try {
+            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}/rules/${pendingDeleteRuleId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('Alert rule deleted successfully!');
+                await fetchAlertRules();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete rule', true);
+            }
+        } catch (error) {
+            alertRules = alertRules.filter(r => r.id !== pendingDeleteRuleId);
+            renderAlertRules();
+            showToast('Alert rule deleted (demo mode)');
+        }
+    } else if (pendingDeleteUserId) {
+        // Delete user
+        try {
+            const response = await fetch(`${API_BASE}/users/${pendingDeleteUserId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('User deleted successfully!');
+                await fetchUsers();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete user', true);
+            }
+        } catch (error) {
+            users = users.filter(u => u.id !== pendingDeleteUserId);
+            renderUsers();
+            showToast('User deleted (demo mode)');
+        }
+    } else if (pendingDeleteDeviceId) {
+        // Delete device
+        try {
+            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('Device deleted successfully!');
+                await fetchDevices();
+                await fetchAlertRules();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete device', true);
+            }
+        } catch (error) {
+            devices = devices.filter(d => d.id !== pendingDeleteDeviceId);
+            renderDevices();
+            showToast('Device deleted (demo mode)');
+        }
+    }
+    
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+    pendingDeleteDeviceName = null;
+    pendingDeleteUserId = null;
+    pendingDeleteUserEmail = null;
+}
+document.getElementById('modal-confirm').addEventListener('click', handleConfirm);

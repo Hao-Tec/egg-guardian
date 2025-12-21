@@ -63,11 +63,31 @@
                     <p class="empty-state">No alert rules configured.</p>
                 </div>
             </section>
+
+            <section class="card card-full">
+                <h2>👥 Registered Users</h2>
+                <div id="users-list" class="list">
+                    <p class="empty-state">No users registered yet.</p>
+                </div>
+            </section>
         </main>
 
         <footer>
             <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank">API Docs</a></p>
         </footer>
+    </div>
+
+    <!-- Modern Confirmation Modal -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-icon">⚠️</div>
+            <h3 class="modal-title">Delete Alert Rule?</h3>
+            <p class="modal-message">This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button id="modal-cancel" class="btn-modal btn-modal-cancel">Cancel</button>
+                <button id="modal-confirm" class="btn-modal btn-modal-delete">Delete</button>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

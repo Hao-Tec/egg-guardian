@@ -53,9 +53,15 @@ class Device(Base):
 
     # Relationships
     owner: Mapped[Optional["User"]] = relationship("User", back_populates="devices")
-    telemetry: Mapped[list["Telemetry"]] = relationship("Telemetry", back_populates="device")
-    alert_rules: Mapped[list["AlertRule"]] = relationship("AlertRule", back_populates="device")
-    alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="device")
+    telemetry: Mapped[list["Telemetry"]] = relationship(
+        "Telemetry", back_populates="device", cascade="all, delete-orphan"
+    )
+    alert_rules: Mapped[list["AlertRule"]] = relationship(
+        "AlertRule", back_populates="device", cascade="all, delete-orphan"
+    )
+    alerts: Mapped[list["Alert"]] = relationship(
+        "Alert", back_populates="device", cascade="all, delete-orphan"
+    )
 
 
 class Telemetry(Base):
