@@ -61,7 +61,7 @@ function renderAlertRules() {
     alertsList.innerHTML = alertRules.map(rule => `
         <div class="list-item">
             <div>
-                <div class="name">Device: ${rule.device_id}</div>
+                <div class="name">${rule.device_name || `Device #${rule.device_id}`}</div>
                 <div class="meta">${rule.temp_min}°C – ${rule.temp_max}°C</div>
             </div>
             <div class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</div>
@@ -87,17 +87,29 @@ async function fetchDevices() {
     }
 }
 
-// Fetch alert rules from API
+// Fetch alert rules from API (for all devices)
 async function fetchAlertRules() {
     try {
-        const response = await fetch(`${API_BASE}/rules`);
-        if (response.ok) {
-            alertRules = await response.json();
-            renderAlertRules();
+        // Alert rules are per-device, so we need to fetch for each device
+        alertRules = [];
+        for (const device of devices) {
+            try {
+                const response = await fetch(`${API_BASE}/devices/${device.id}/rules`);
+                if (response.ok) {
+                    const rules = await response.json();
+                    // Add device name to each rule for display
+                    rules.forEach(rule => {
+                        rule.device_name = device.name;
+                    });
+                    alertRules = alertRules.concat(rules);
+                }
+            } catch (e) {
+                console.error(`Failed to fetch rules for device ${device.id}:`, e);
+            }
         }
+        renderAlertRules();
     } catch (error) {
         console.error('Failed to fetch alert rules:', error);
-        // Use mock data for demo
         alertRules = [];
         renderAlertRules();
     }
