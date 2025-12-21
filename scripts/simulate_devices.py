@@ -80,7 +80,7 @@ def main():
         help="MQTT broker address"
     )
     parser.add_argument(
-        "--port", type=int, default=1883,
+        "--port", type=int, default=11883,
         help="MQTT broker port"
     )
     
