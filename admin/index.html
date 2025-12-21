@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Egg Guardian Admin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🥚 Egg Guardian Admin</h1>
+            <p class="subtitle">Device & Alert Management</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <h2>Register Device</h2>
+                <form id="device-form">
+                    <div class="form-group">
+                        <label for="device-id">Device ID</label>
+                        <input type="text" id="device-id" placeholder="eggpod-01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="device-name">Device Name</label>
+                        <input type="text" id="device-name" placeholder="Incubator A" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register Device</button>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2>Create Alert Rule</h2>
+                <form id="alert-form">
+                    <div class="form-group">
+                        <label for="alert-device">Device</label>
+                        <select id="alert-device" required>
+                            <option value="">Select device...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="temp-min">Min Temperature (°C)</label>
+                        <input type="number" id="temp-min" step="0.1" value="35.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="temp-max">Max Temperature (°C)</label>
+                        <input type="number" id="temp-max" step="0.1" value="39.0">
+                    </div>
+                    <button type="submit" class="btn btn-warning">Create Alert Rule</button>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2>Registered Devices</h2>
+                <div id="devices-list" class="list">
+                    <p class="empty-state">No devices registered yet.</p>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Alert Rules</h2>
+                <div id="alerts-list" class="list">
+                    <p class="empty-state">No alert rules configured.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank">API Docs</a></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

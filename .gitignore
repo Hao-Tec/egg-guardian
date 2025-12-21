@@ -1,0 +1,49 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Flutter
+mobile/egg_guardian/.dart_tool/
+mobile/egg_guardian/.packages
+mobile/egg_guardian/build/
+mobile/egg_guardian/.flutter-plugins
+mobile/egg_guardian/.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Firmware
+firmware/.pio/
+firmware/.vscode/
+
+# Node
+node_modules/
