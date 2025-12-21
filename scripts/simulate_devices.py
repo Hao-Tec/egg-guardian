@@ -83,11 +83,16 @@ def main():
         "--port", type=int, default=11883,
         help="MQTT broker port"
     )
+    parser.add_argument(
+        "--prefix", type=str, default="eggpod",
+        help="Device ID prefix (e.g., 'TEST' creates 'TEST-01')"
+    )
     
     args = parser.parse_args()
     
-    # Device IDs
-    devices = [f"eggpod-{i+1:02d}" for i in range(args.count)]
+    # Device IDs - use custom prefix if provided
+    devices = [f"{args.prefix}-{i+1:02d}" if args.count > 1 else args.prefix 
+               for i in range(args.count)]
     
     # MQTT setup
     userdata = {"published": 0}

@@ -109,9 +109,8 @@ async def update_device(
 async def delete_device(
     device_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Delete a device (authenticated)."""
+    """Delete a device (public for MVP demo)."""
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     if not device:

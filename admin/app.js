@@ -41,7 +41,10 @@ function renderDevices() {
                 <div class="name">${device.name}</div>
                 <div class="meta">${device.device_id}</div>
             </div>
-            <div class="meta">${device.is_active ? '🟢 Active' : '⚪ Inactive'}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${device.is_active ? '🟢 Active' : '⚪ Inactive'}</span>
+                <button class="delete-btn" onclick="deleteDevice(${device.id}, '${device.name}')" title="Delete device">🗑️</button>
+            </div>
         </div>
     `).join('');
     
@@ -216,6 +219,11 @@ let pendingDeleteRuleId = null;
 function deleteRule(deviceId, ruleId) {
     pendingDeleteDeviceId = deviceId;
     pendingDeleteRuleId = ruleId;
+    
+    // Update modal text for rule deletion
+    document.querySelector('.modal-title').textContent = 'Delete Alert Rule?';
+    document.querySelector('.modal-message').textContent = 'This action cannot be undone.';
+    
     document.getElementById('confirm-modal').classList.remove('hidden');
 }
 
@@ -226,39 +234,80 @@ document.getElementById('modal-cancel').addEventListener('click', () => {
     pendingDeleteRuleId = null;
 });
 
-document.getElementById('modal-confirm').addEventListener('click', async () => {
-    document.getElementById('confirm-modal').classList.add('hidden');
-    
-    if (!pendingDeleteDeviceId || !pendingDeleteRuleId) return;
-    
-    try {
-        const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}/rules/${pendingDeleteRuleId}`, {
-            method: 'DELETE',
-        });
-        
-        if (response.ok || response.status === 204) {
-            showToast('Alert rule deleted successfully!');
-            await fetchAlertRules();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to delete rule', true);
-        }
-    } catch (error) {
-        // Demo mode - remove locally
-        alertRules = alertRules.filter(r => r.id !== pendingDeleteRuleId);
-        renderAlertRules();
-        showToast('Alert rule deleted (demo mode)');
-    }
-    
-    pendingDeleteDeviceId = null;
-    pendingDeleteRuleId = null;
-});
-
 // Close modal on overlay click
 document.getElementById('confirm-modal').addEventListener('click', (e) => {
     if (e.target.id === 'confirm-modal') {
         document.getElementById('confirm-modal').classList.add('hidden');
         pendingDeleteDeviceId = null;
         pendingDeleteRuleId = null;
+        pendingDeleteDeviceName = null;
     }
 });
+
+// Delete a device
+let pendingDeleteDeviceName = null;
+
+function deleteDevice(deviceId, deviceName) {
+    pendingDeleteDeviceId = deviceId;
+    pendingDeleteDeviceName = deviceName;
+    pendingDeleteRuleId = null; // Not deleting a rule
+    
+    // Update modal text
+    document.querySelector('.modal-title').textContent = 'Delete Device?';
+    document.querySelector('.modal-message').textContent = 
+        `Are you sure you want to delete "${deviceName}"? All telemetry data and alert rules will also be deleted.`;
+    
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+// Override confirm click to handle both device and rule deletion
+document.getElementById('modal-confirm').removeEventListener('click', handleConfirm);
+async function handleConfirm() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    
+    if (pendingDeleteRuleId) {
+        // Delete rule
+        try {
+            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}/rules/${pendingDeleteRuleId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('Alert rule deleted successfully!');
+                await fetchAlertRules();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete rule', true);
+            }
+        } catch (error) {
+            alertRules = alertRules.filter(r => r.id !== pendingDeleteRuleId);
+            renderAlertRules();
+            showToast('Alert rule deleted (demo mode)');
+        }
+    } else if (pendingDeleteDeviceId) {
+        // Delete device
+        try {
+            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok || response.status === 204) {
+                showToast('Device deleted successfully!');
+                await fetchDevices();
+                await fetchAlertRules();
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to delete device', true);
+            }
+        } catch (error) {
+            devices = devices.filter(d => d.id !== pendingDeleteDeviceId);
+            renderDevices();
+            showToast('Device deleted (demo mode)');
+        }
+    }
+    
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+    pendingDeleteDeviceName = null;
+}
+document.getElementById('modal-confirm').addEventListener('click', handleConfirm);
