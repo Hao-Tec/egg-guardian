@@ -210,13 +210,29 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Delete an alert rule
-async function deleteRule(deviceId, ruleId) {
-    if (!confirm('Are you sure you want to delete this alert rule?')) {
-        return;
-    }
+let pendingDeleteDeviceId = null;
+let pendingDeleteRuleId = null;
+
+function deleteRule(deviceId, ruleId) {
+    pendingDeleteDeviceId = deviceId;
+    pendingDeleteRuleId = ruleId;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+// Modal event handlers
+document.getElementById('modal-cancel').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+});
+
+document.getElementById('modal-confirm').addEventListener('click', async () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    
+    if (!pendingDeleteDeviceId || !pendingDeleteRuleId) return;
     
     try {
-        const response = await fetch(`${API_BASE}/devices/${deviceId}/rules/${ruleId}`, {
+        const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}/rules/${pendingDeleteRuleId}`, {
             method: 'DELETE',
         });
         
@@ -229,8 +245,20 @@ async function deleteRule(deviceId, ruleId) {
         }
     } catch (error) {
         // Demo mode - remove locally
-        alertRules = alertRules.filter(r => r.id !== ruleId);
+        alertRules = alertRules.filter(r => r.id !== pendingDeleteRuleId);
         renderAlertRules();
         showToast('Alert rule deleted (demo mode)');
     }
-}
+    
+    pendingDeleteDeviceId = null;
+    pendingDeleteRuleId = null;
+});
+
+// Close modal on overlay click
+document.getElementById('confirm-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'confirm-modal') {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        pendingDeleteDeviceId = null;
+        pendingDeleteRuleId = null;
+    }
+});
