@@ -1,0 +1,31 @@
+/**
+ * Egg Guardian Firmware Configuration
+ * 
+ * Copy this file to config.h and update with your values.
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// WiFi Configuration
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+
+// MQTT Configuration
+#define MQTT_BROKER "192.168.1.100"  // Your MQTT broker IP
+#define MQTT_PORT 1883
+#define MQTT_USER ""  // Leave empty if no auth
+#define MQTT_PASSWORD ""
+
+// Device Configuration
+#define DEVICE_ID "eggpod-01"
+
+// Sensor Configuration
+#define ONE_WIRE_PIN 4  // GPIO4 for DS18B20 data pin
+#define TEMP_READ_INTERVAL_MS 5000  // Read every 5 seconds
+#define MQTT_PUBLISH_INTERVAL_MS 10000  // Publish every 10 seconds
+
+// Buffer Configuration
+#define MAX_BUFFER_SIZE 20  // Maximum telemetry points to buffer
+
+#endif
