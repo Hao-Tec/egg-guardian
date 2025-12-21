@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main, scaffold]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-api:
+    name: Test API
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: services/api
+        run: |
+          pip install -r requirements.txt
+          pip install aiosqlite
+
+      - name: Run tests
+        working-directory: .
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          JWT_SECRET_KEY: test-secret-key
+          MQTT_BROKER: localhost
+          MQTT_PORT: 1883
+        run: |
+          cd services/api
+          python -m pytest ../../tests -v --tb=short
+
+  lint-api:
+    name: Lint API
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linters
+        run: pip install black ruff
+
+      - name: Check formatting
+        working-directory: services/api
+        run: black --check app/
+
+      - name: Lint code
+        working-directory: services/api
+        run: ruff check app/
+
+  test-flutter:
+    name: Test Flutter
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Get dependencies
+        working-directory: mobile/egg_guardian
+        run: flutter pub get
+
+      - name: Analyze code
+        working-directory: mobile/egg_guardian
+        run: flutter analyze --no-fatal-infos
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -t egg-api services/api
+
+      - name: Test docker-compose config
+        run: docker-compose config
