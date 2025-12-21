@@ -176,3 +176,26 @@ async def create_device_rule(
     await db.flush()
     await db.refresh(rule)
     return rule
+
+
+@router.delete("/{device_id}/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_device_rule(
+    device_id: int,
+    rule_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an alert rule."""
+    result = await db.execute(
+        select(AlertRule).where(
+            AlertRule.id == rule_id,
+            AlertRule.device_id == device_id,
+        )
+    )
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alert rule not found",
+        )
+
+    await db.delete(rule)

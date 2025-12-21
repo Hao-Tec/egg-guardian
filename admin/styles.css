@@ -206,3 +206,19 @@ footer a:hover {
         opacity: 1;
     }
 }
+
+/* Delete button */
+.delete-btn {
+    background: transparent;
+    border: 1px solid var(--warning);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.delete-btn:hover {
+    background: var(--warning);
+    transform: scale(1.05);
+}

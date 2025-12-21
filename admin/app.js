@@ -64,7 +64,10 @@ function renderAlertRules() {
                 <div class="name">${rule.device_name || `Device #${rule.device_id}`}</div>
                 <div class="meta">${rule.temp_min}°C – ${rule.temp_max}°C</div>
             </div>
-            <div class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</span>
+                <button class="delete-btn" onclick="deleteRule(${rule.device_id}, ${rule.id})" title="Delete rule">🗑️</button>
+            </div>
         </div>
     `).join('');
 }
@@ -205,3 +208,29 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchDevices();
     fetchAlertRules();
 });
+
+// Delete an alert rule
+async function deleteRule(deviceId, ruleId) {
+    if (!confirm('Are you sure you want to delete this alert rule?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/devices/${deviceId}/rules/${ruleId}`, {
+            method: 'DELETE',
+        });
+        
+        if (response.ok || response.status === 204) {
+            showToast('Alert rule deleted successfully!');
+            await fetchAlertRules();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to delete rule', true);
+        }
+    } catch (error) {
+        // Demo mode - remove locally
+        alertRules = alertRules.filter(r => r.id !== ruleId);
+        renderAlertRules();
+        showToast('Alert rule deleted (demo mode)');
+    }
+}
