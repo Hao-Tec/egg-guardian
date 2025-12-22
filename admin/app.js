@@ -121,6 +121,15 @@ loginForm.addEventListener('submit', async (e) => {
 // Logout handler
 logoutBtn.addEventListener('click', logout);
 
+// Password visibility toggle
+document.getElementById('toggle-password').addEventListener('click', function() {
+    const passwordInput = document.getElementById('login-password');
+    const isPassword = passwordInput.type === 'password';
+    passwordInput.type = isPassword ? 'text' : 'password';
+    this.textContent = isPassword ? '🙈' : '👁️';
+    this.title = isPassword ? 'Hide password' : 'Show password';
+});
+
 // Toast notification
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
@@ -479,8 +488,14 @@ async function handleConfirm() {
             });
             
             if (response.ok || response.status === 204) {
-                showToast('User deleted successfully!');
-                await fetchUsers();
+                // Check if user deleted themselves
+                if (currentUser && pendingDeleteUserId === currentUser.id) {
+                    showToast('You deleted your own account. Logging out...');
+                    setTimeout(() => logout(), 1500);
+                } else {
+                    showToast('User deleted successfully!');
+                    await fetchUsers();
+                }
             } else {
                 const error = await response.json();
                 showToast(error.detail || 'Failed to delete user', true);
