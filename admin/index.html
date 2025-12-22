@@ -98,23 +98,26 @@
                 </div>
             </section>
 
-            <section class="card card-full">
-                <div class="section-header">
-                    <div class="header-left">
+            <section class="card card-full alerts-section">
+                <div class="alerts-header">
+                    <div class="alerts-title-row">
                         <h2>🚨 Triggered Alerts</h2>
-                        <span id="alerts-refresh-indicator" class="refresh-indicator">⟳ Auto-updating</span>
+                        <span class="refresh-badge">⟳ Live</span>
                     </div>
-                    <div class="header-right">
-                        <label class="toggle-label">
+                    <div class="alerts-controls">
+                        <label class="toggle-switch">
                             <input type="checkbox" id="show-acknowledged" onchange="toggleAlertFilter()">
-                            Show acknowledged
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Show acknowledged</span>
                         </label>
-                        <button class="btn btn-small" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
-                        <button class="btn btn-small btn-warning-small" onclick="clearAcknowledgedAlerts()">🗑️ Clear Old</button>
+                        <div class="btn-group">
+                            <button class="btn-action" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
+                            <button class="btn-action btn-danger" onclick="clearAcknowledgedAlerts()">🗑️ Clear Old</button>
+                        </div>
                     </div>
                 </div>
-                <div id="triggered-alerts-list" class="list alerts-container">
-                    <p class="empty-state">No alerts triggered yet.</p>
+                <div id="triggered-alerts-list" class="alerts-list">
+                    <p class="empty-state">No alerts triggered yet. 🎉</p>
                 </div>
             </section>
 
