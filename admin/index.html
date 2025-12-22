@@ -7,10 +7,46 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-overlay">
+        <div class="login-card">
+            <div class="login-icon">🥚</div>
+            <h1>Egg Guardian</h1>
+            <h2>Admin Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="admin@egg.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="login-password" placeholder="••••••••" required>
+                        <button type="button" id="toggle-password" class="password-toggle" title="Show password">👁️</button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-glow">Sign In</button>
+                <p id="login-error" class="error-text"></p>
+            </form>
+            <p class="login-footer">Secure admin access only</p>
+        </div>
+    </div>
+
+    <!-- Main Admin Panel -->
+    <div id="admin-panel" class="container hidden">
         <header>
-            <h1>🥚 Egg Guardian Admin</h1>
-            <p class="subtitle">Device & Alert Management</p>
+            <div class="header-content">
+                <div class="header-top">
+                    <div class="header-brand">
+                        <h1>🥚 Egg Guardian Admin</h1>
+                        <p class="subtitle">Device & Alert Management</p>
+                    </div>
+                    <div class="header-actions">
+                        <span id="admin-email" class="admin-badge">admin</span>
+                        <button id="logout-btn" class="btn-logout">Logout</button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main>
@@ -64,6 +100,29 @@
                 </div>
             </section>
 
+            <section class="card card-full alerts-section">
+                <div class="alerts-header">
+                    <div class="alerts-title-row">
+                        <h2>🚨 Triggered Alerts</h2>
+                        <span class="refresh-badge">⟳ Live</span>
+                    </div>
+                    <div class="alerts-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="show-acknowledged" onchange="toggleAlertFilter()">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Show acknowledged</span>
+                        </label>
+                        <div class="btn-group">
+                            <button class="btn-action" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
+                            <button class="btn-action btn-danger" onclick="clearAcknowledgedAlerts()">🗑️ Clear Old</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="triggered-alerts-list" class="alerts-list">
+                    <p class="empty-state">No alerts triggered yet. 🎉</p>
+                </div>
+            </section>
+
             <section class="card card-full">
                 <h2>👥 Registered Users</h2>
                 <div id="users-list" class="list">
@@ -73,7 +132,7 @@
         </main>
 
         <footer>
-            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank">API Docs</a></p>
+            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank" rel="noopener">API Docs</a></p>
         </footer>
     </div>
 

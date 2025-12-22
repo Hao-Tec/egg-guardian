@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import auth, devices, health, telemetry, users
+from app.routers import alerts, auth, devices, health, telemetry, users
 from app.services.mqtt import get_mqtt_service
 
 settings = get_settings()
@@ -62,3 +62,4 @@ app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(telemetry.router)
 app.include_router(users.router)
+app.include_router(alerts.router)

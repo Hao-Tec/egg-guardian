@@ -8,6 +8,9 @@ const API_BASE = 'http://localhost:8000/api/v1';
 let devices = [];
 let alertRules = [];
 let users = [];
+let triggeredAlerts = [];
+let authToken = localStorage.getItem('admin_token');
+let currentUser = null;
 
 // DOM elements
 const deviceForm = document.getElementById('device-form');
@@ -16,6 +19,123 @@ const devicesList = document.getElementById('devices-list');
 const alertsList = document.getElementById('alerts-list');
 const alertDeviceSelect = document.getElementById('alert-device');
 const usersList = document.getElementById('users-list');
+const triggeredAlertsList = document.getElementById('triggered-alerts-list');
+const loginScreen = document.getElementById('login-screen');
+const adminPanel = document.getElementById('admin-panel');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const adminEmail = document.getElementById('admin-email');
+const logoutBtn = document.getElementById('logout-btn');
+
+// ============== Authentication ==============
+
+async function checkAuth() {
+    if (!authToken) {
+        showLogin();
+        return false;
+    }
+    
+    try {
+        // Verify token by fetching current user info
+        const response = await fetch(`${API_BASE}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Invalid token');
+        }
+        
+        currentUser = await response.json();
+        
+        // Check if user is admin
+        if (!currentUser.is_superuser) {
+            loginError.textContent = 'Access denied. You are not an admin.';
+            logout();
+            return false;
+        }
+        
+        showAdminPanel();
+        return true;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        logout();
+        return false;
+    }
+}
+
+function showLogin() {
+    loginScreen.classList.remove('hidden');
+    adminPanel.classList.add('hidden');
+}
+
+function showAdminPanel() {
+    loginScreen.classList.add('hidden');
+    adminPanel.classList.remove('hidden');
+    adminEmail.textContent = `👤 ${currentUser?.email || 'Admin'}`;
+    
+    // Load data
+    fetchDevices();
+    fetchAlertRules();
+    fetchUsers();
+    fetchTriggeredAlerts();
+    
+    // Start auto-refresh for alerts
+    startAlertsAutoRefresh();
+}
+
+async function login(email, password) {
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Login failed');
+        }
+        
+        const data = await response.json();
+        authToken = data.access_token;
+        localStorage.setItem('admin_token', authToken);
+        
+        await checkAuth();
+    } catch (error) {
+        loginError.textContent = error.message;
+    }
+}
+
+function logout() {
+    stopAlertsAutoRefresh();
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('admin_token');
+    showLogin();
+}
+
+// Login form handler
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    await login(email, password);
+});
+
+// Logout handler
+logoutBtn.addEventListener('click', logout);
+
+// Password visibility toggle
+document.getElementById('toggle-password').addEventListener('click', function() {
+    const passwordInput = document.getElementById('login-password');
+    const isPassword = passwordInput.type === 'password';
+    passwordInput.type = isPassword ? 'text' : 'password';
+    this.textContent = isPassword ? '🙈' : '👁️';
+    this.title = isPassword ? 'Hide password' : 'Show password';
+});
 
 // Toast notification
 function showToast(message, isError = false) {
@@ -133,15 +253,43 @@ function renderUsers() {
     usersList.innerHTML = users.map(user => `
         <div class="list-item">
             <div>
-                <div class="name">${user.email}</div>
+                <div class="name">
+                    ${user.email}
+                    ${user.is_superuser ? '<span class="role-badge admin">Admin</span>' : '<span class="role-badge user">User</span>'}
+                </div>
                 <div class="meta">${user.full_name || 'No name'} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="meta">${user.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-toggle ${user.is_superuser ? 'active' : ''}" 
+                        onclick="toggleAdminStatus(${user.id})" 
+                        title="${user.is_superuser ? 'Remove admin' : 'Make admin'}">
+                    ${user.is_superuser ? '👑 Admin' : '🔓 Make Admin'}
+                </button>
                 <button class="delete-btn" onclick="deleteUser(${user.id}, '${user.email}')" title="Delete user">🗑️</button>
             </div>
         </div>
     `).join('');
+}
+
+// Toggle admin status for a user
+async function toggleAdminStatus(userId) {
+    try {
+        const response = await fetch(`${API_BASE}/users/${userId}/toggle-admin`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            showToast(`${user.email} is now ${user.is_superuser ? 'an admin' : 'a regular user'}`);
+            await fetchUsers();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to toggle admin status', true);
+        }
+    } catch (error) {
+        console.error('Toggle admin failed:', error);
+        showToast('Failed to toggle admin status', true);
+    }
 }
 
 // Fetch users from API
@@ -156,6 +304,148 @@ async function fetchUsers() {
         console.error('Failed to fetch users:', error);
         users = [];
         renderUsers();
+    }
+}
+
+// ============== Triggered Alerts ==============
+
+// Render triggered alerts
+function renderTriggeredAlerts() {
+    if (triggeredAlerts.length === 0) {
+        triggeredAlertsList.innerHTML = '<p class="empty-state">No alerts triggered yet. 🎉</p>';
+        return;
+    }
+    
+    triggeredAlertsList.innerHTML = triggeredAlerts.map(alert => {
+        const device = devices.find(d => d.id === alert.device_id);
+        const deviceName = device ? device.name : `Device #${alert.device_id}`;
+        const time = new Date(alert.triggered_at).toLocaleString();
+        const alertClass = alert.is_acknowledged ? 'acknowledged' : 'unacknowledged';
+        const icon = alert.alert_type === 'high' ? '🔥' : '❄️';
+        
+        return `
+            <div class="alert-item ${alertClass}">
+                <div class="alert-info">
+                    <div class="alert-header">
+                        <span class="alert-icon">${icon}</span>
+                        <span class="alert-type ${alert.alert_type}">${alert.alert_type.toUpperCase()}</span>
+                        <span class="alert-device">${deviceName}</span>
+                    </div>
+                    <div class="alert-message">${alert.message}</div>
+                    <div class="alert-time">${time}</div>
+                </div>
+                <div class="alert-actions">
+                    ${!alert.is_acknowledged ? 
+                        `<button class="btn btn-small" onclick="acknowledgeAlert(${alert.id})">✓ Acknowledge</button>` : 
+                        '<span class="acknowledged-badge">✓ Acknowledged</span>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Fetch triggered alerts from API
+let showAcknowledged = false;
+let alertsRefreshInterval = null;
+
+async function fetchTriggeredAlerts() {
+    try {
+        const url = showAcknowledged 
+            ? `${API_BASE}/alerts?limit=50` 
+            : `${API_BASE}/alerts?unacknowledged_only=true&limit=20`;
+        const response = await fetch(url);
+        if (response.ok) {
+            triggeredAlerts = await response.json();
+            renderTriggeredAlerts();
+        }
+    } catch (error) {
+        console.error('Failed to fetch alerts:', error);
+        triggeredAlerts = [];
+        renderTriggeredAlerts();
+    }
+}
+
+// Start auto-refresh for alerts
+function startAlertsAutoRefresh() {
+    if (alertsRefreshInterval) clearInterval(alertsRefreshInterval);
+    alertsRefreshInterval = setInterval(() => {
+        fetchTriggeredAlerts();
+    }, 5000); // Refresh every 5 seconds
+}
+
+// Stop auto-refresh
+function stopAlertsAutoRefresh() {
+    if (alertsRefreshInterval) {
+        clearInterval(alertsRefreshInterval);
+        alertsRefreshInterval = null;
+    }
+}
+
+// Toggle alert filter
+function toggleAlertFilter() {
+    showAcknowledged = document.getElementById('show-acknowledged').checked;
+    fetchTriggeredAlerts();
+}
+
+// Acknowledge a single alert
+async function acknowledgeAlert(alertId) {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            showToast('Alert acknowledged!');
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to acknowledge alert', true);
+        }
+    } catch (error) {
+        console.error('Acknowledge failed:', error);
+        showToast('Failed to acknowledge alert', true);
+    }
+}
+
+// Acknowledge all alerts
+async function acknowledgeAllAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/acknowledge-all`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`${result.acknowledged} alerts acknowledged!`);
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to acknowledge alerts', true);
+        }
+    } catch (error) {
+        console.error('Acknowledge all failed:', error);
+        showToast('Failed to acknowledge alerts', true);
+    }
+}
+
+// Clear (delete) acknowledged alerts
+async function clearAcknowledgedAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/clear-acknowledged`, {
+            method: 'DELETE',
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`${result.deleted} old alerts cleared!`);
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to clear alerts', true);
+        }
+    } catch (error) {
+        console.error('Clear alerts failed:', error);
+        showToast('Failed to clear alerts', true);
     }
 }
 
@@ -264,9 +554,7 @@ alertForm.addEventListener('submit', async (e) => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    fetchDevices();
-    fetchAlertRules();
-    fetchUsers();
+    checkAuth();
 });
 
 // Delete an alert rule
@@ -349,8 +637,14 @@ async function handleConfirm() {
             });
             
             if (response.ok || response.status === 204) {
-                showToast('User deleted successfully!');
-                await fetchUsers();
+                // Check if user deleted themselves
+                if (currentUser && pendingDeleteUserId === currentUser.id) {
+                    showToast('You deleted your own account. Logging out...');
+                    setTimeout(() => logout(), 1500);
+                } else {
+                    showToast('User deleted successfully!');
+                    await fetchUsers();
+                }
             } else {
                 const error = await response.json();
                 showToast(error.detail || 'Failed to delete user', true);

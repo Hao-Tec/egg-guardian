@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isRegister = false;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -114,14 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 v!.isEmpty ? 'Email is required' : null,
                           ),
                           const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            icon: Icons.lock_outline,
-                            obscureText: true,
-                            validator: (v) =>
-                                v!.length < 6 ? 'Min 6 characters' : null,
-                          ),
+                          _buildPasswordField(),
                           if (_error != null) ...[
                             const SizedBox(height: 16),
                             Container(
@@ -244,6 +238,37 @@ class _LoginScreenState extends State<LoginScreen> {
         labelText: label,
         labelStyle: TextStyle(color: Colors.grey[400]),
         prefixIcon: Icon(icon, color: Colors.grey[400]),
+        filled: true,
+        fillColor: const Color(0xFF334155),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.amber),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return TextFormField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      validator: (v) => v!.length < 6 ? 'Min 6 characters' : null,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: 'Password',
+        labelStyle: TextStyle(color: Colors.grey[400]),
+        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[400]),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+            color: Colors.grey[400],
+          ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
         filled: true,
         fillColor: const Color(0xFF334155),
         border: OutlineInputBorder(
