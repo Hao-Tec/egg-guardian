@@ -52,7 +52,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     try {
       final history = await ApiService().getTelemetry(
         widget.device.id,
-        hours: 1,
+        hours: 24,
       );
 
       setState(() {
@@ -81,7 +81,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     try {
       final history = await ApiService().getTelemetry(
         widget.device.id,
-        hours: 1,
+        hours: 24,
       );
 
       if (!mounted) return;
