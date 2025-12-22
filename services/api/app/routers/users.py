@@ -53,3 +53,24 @@ async def delete_user(
         )
 
     await db.delete(user)
+
+
+@router.patch("/{user_id}/toggle-admin", response_model=UserResponse)
+async def toggle_admin_status(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle admin (superuser) status for a user."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Toggle is_superuser
+    user.is_superuser = not user.is_superuser
+    await db.flush()
+    await db.refresh(user)
+    return user

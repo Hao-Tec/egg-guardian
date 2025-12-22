@@ -8,6 +8,8 @@ const API_BASE = 'http://localhost:8000/api/v1';
 let devices = [];
 let alertRules = [];
 let users = [];
+let authToken = localStorage.getItem('admin_token');
+let currentUser = null;
 
 // DOM elements
 const deviceForm = document.getElementById('device-form');
@@ -16,6 +18,108 @@ const devicesList = document.getElementById('devices-list');
 const alertsList = document.getElementById('alerts-list');
 const alertDeviceSelect = document.getElementById('alert-device');
 const usersList = document.getElementById('users-list');
+const loginScreen = document.getElementById('login-screen');
+const adminPanel = document.getElementById('admin-panel');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const adminEmail = document.getElementById('admin-email');
+const logoutBtn = document.getElementById('logout-btn');
+
+// ============== Authentication ==============
+
+async function checkAuth() {
+    if (!authToken) {
+        showLogin();
+        return false;
+    }
+    
+    try {
+        // Verify token by fetching current user info
+        const response = await fetch(`${API_BASE}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Invalid token');
+        }
+        
+        currentUser = await response.json();
+        
+        // Check if user is admin
+        if (!currentUser.is_superuser) {
+            loginError.textContent = 'Access denied. You are not an admin.';
+            logout();
+            return false;
+        }
+        
+        showAdminPanel();
+        return true;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        logout();
+        return false;
+    }
+}
+
+function showLogin() {
+    loginScreen.classList.remove('hidden');
+    adminPanel.classList.add('hidden');
+}
+
+function showAdminPanel() {
+    loginScreen.classList.add('hidden');
+    adminPanel.classList.remove('hidden');
+    adminEmail.textContent = `👤 ${currentUser?.email || 'Admin'}`;
+    
+    // Load data
+    fetchDevices();
+    fetchAlertRules();
+    fetchUsers();
+}
+
+async function login(email, password) {
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Login failed');
+        }
+        
+        const data = await response.json();
+        authToken = data.access_token;
+        localStorage.setItem('admin_token', authToken);
+        
+        await checkAuth();
+    } catch (error) {
+        loginError.textContent = error.message;
+    }
+}
+
+function logout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('admin_token');
+    showLogin();
+}
+
+// Login form handler
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    await login(email, password);
+});
+
+// Logout handler
+logoutBtn.addEventListener('click', logout);
 
 // Toast notification
 function showToast(message, isError = false) {
@@ -133,15 +237,43 @@ function renderUsers() {
     usersList.innerHTML = users.map(user => `
         <div class="list-item">
             <div>
-                <div class="name">${user.email}</div>
+                <div class="name">
+                    ${user.email}
+                    ${user.is_superuser ? '<span class="role-badge admin">Admin</span>' : '<span class="role-badge user">User</span>'}
+                </div>
                 <div class="meta">${user.full_name || 'No name'} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="meta">${user.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-toggle ${user.is_superuser ? 'active' : ''}" 
+                        onclick="toggleAdminStatus(${user.id})" 
+                        title="${user.is_superuser ? 'Remove admin' : 'Make admin'}">
+                    ${user.is_superuser ? '👑 Admin' : '🔓 Make Admin'}
+                </button>
                 <button class="delete-btn" onclick="deleteUser(${user.id}, '${user.email}')" title="Delete user">🗑️</button>
             </div>
         </div>
     `).join('');
+}
+
+// Toggle admin status for a user
+async function toggleAdminStatus(userId) {
+    try {
+        const response = await fetch(`${API_BASE}/users/${userId}/toggle-admin`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            showToast(`${user.email} is now ${user.is_superuser ? 'an admin' : 'a regular user'}`);
+            await fetchUsers();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to toggle admin status', true);
+        }
+    } catch (error) {
+        console.error('Toggle admin failed:', error);
+        showToast('Failed to toggle admin status', true);
+    }
 }
 
 // Fetch users from API
@@ -264,9 +396,7 @@ alertForm.addEventListener('submit', async (e) => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    fetchDevices();
-    fetchAlertRules();
-    fetchUsers();
+    checkAuth();
 });
 
 // Delete an alert rule

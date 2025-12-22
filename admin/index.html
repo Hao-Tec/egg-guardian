@@ -7,10 +7,39 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-overlay">
+        <div class="login-card">
+            <h1>🥚 Egg Guardian</h1>
+            <h2>Admin Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="admin@egg.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+                <p id="login-error" class="error-text"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Admin Panel -->
+    <div id="admin-panel" class="container hidden">
         <header>
-            <h1>🥚 Egg Guardian Admin</h1>
-            <p class="subtitle">Device & Alert Management</p>
+            <div class="header-content">
+                <div>
+                    <h1>🥚 Egg Guardian Admin</h1>
+                    <p class="subtitle">Device & Alert Management</p>
+                </div>
+                <div class="header-actions">
+                    <span id="admin-email" class="admin-badge">👤 admin</span>
+                    <button id="logout-btn" class="btn btn-small">Logout</button>
+                </div>
+            </div>
         </header>
 
         <main>
@@ -73,7 +102,7 @@
         </main>
 
         <footer>
-            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank">API Docs</a></p>
+            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank" rel="noopener">API Docs</a></p>
         </footer>
     </div>
 
