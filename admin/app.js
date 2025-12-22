@@ -78,6 +78,9 @@ function showAdminPanel() {
     fetchAlertRules();
     fetchUsers();
     fetchTriggeredAlerts();
+    
+    // Start auto-refresh for alerts
+    startAlertsAutoRefresh();
 }
 
 async function login(email, password) {
@@ -104,6 +107,7 @@ async function login(email, password) {
 }
 
 function logout() {
+    stopAlertsAutoRefresh();
     authToken = null;
     currentUser = null;
     localStorage.removeItem('admin_token');
@@ -341,9 +345,15 @@ function renderTriggeredAlerts() {
 }
 
 // Fetch triggered alerts from API
+let showAcknowledged = false;
+let alertsRefreshInterval = null;
+
 async function fetchTriggeredAlerts() {
     try {
-        const response = await fetch(`${API_BASE}/alerts`);
+        const url = showAcknowledged 
+            ? `${API_BASE}/alerts?limit=50` 
+            : `${API_BASE}/alerts?unacknowledged_only=true&limit=20`;
+        const response = await fetch(url);
         if (response.ok) {
             triggeredAlerts = await response.json();
             renderTriggeredAlerts();
@@ -353,6 +363,28 @@ async function fetchTriggeredAlerts() {
         triggeredAlerts = [];
         renderTriggeredAlerts();
     }
+}
+
+// Start auto-refresh for alerts
+function startAlertsAutoRefresh() {
+    if (alertsRefreshInterval) clearInterval(alertsRefreshInterval);
+    alertsRefreshInterval = setInterval(() => {
+        fetchTriggeredAlerts();
+    }, 5000); // Refresh every 5 seconds
+}
+
+// Stop auto-refresh
+function stopAlertsAutoRefresh() {
+    if (alertsRefreshInterval) {
+        clearInterval(alertsRefreshInterval);
+        alertsRefreshInterval = null;
+    }
+}
+
+// Toggle alert filter
+function toggleAlertFilter() {
+    showAcknowledged = document.getElementById('show-acknowledged').checked;
+    fetchTriggeredAlerts();
 }
 
 // Acknowledge a single alert
@@ -393,6 +425,27 @@ async function acknowledgeAllAlerts() {
     } catch (error) {
         console.error('Acknowledge all failed:', error);
         showToast('Failed to acknowledge alerts', true);
+    }
+}
+
+// Clear (delete) acknowledged alerts
+async function clearAcknowledgedAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/clear-acknowledged`, {
+            method: 'DELETE',
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`${result.deleted} old alerts cleared!`);
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to clear alerts', true);
+        }
+    } catch (error) {
+        console.error('Clear alerts failed:', error);
+        showToast('Failed to clear alerts', true);
     }
 }
 

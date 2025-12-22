@@ -100,10 +100,20 @@
 
             <section class="card card-full">
                 <div class="section-header">
-                    <h2>🚨 Triggered Alerts</h2>
-                    <button id="acknowledge-all-btn" class="btn btn-small" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
+                    <div class="header-left">
+                        <h2>🚨 Triggered Alerts</h2>
+                        <span id="alerts-refresh-indicator" class="refresh-indicator">⟳ Auto-updating</span>
+                    </div>
+                    <div class="header-right">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="show-acknowledged" onchange="toggleAlertFilter()">
+                            Show acknowledged
+                        </label>
+                        <button class="btn btn-small" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
+                        <button class="btn btn-small btn-warning-small" onclick="clearAcknowledgedAlerts()">🗑️ Clear Old</button>
+                    </div>
                 </div>
-                <div id="triggered-alerts-list" class="list">
+                <div id="triggered-alerts-list" class="list alerts-container">
                     <p class="empty-state">No alerts triggered yet.</p>
                 </div>
             </section>
