@@ -99,6 +99,16 @@
             </section>
 
             <section class="card card-full">
+                <div class="section-header">
+                    <h2>🚨 Triggered Alerts</h2>
+                    <button id="acknowledge-all-btn" class="btn btn-small" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
+                </div>
+                <div id="triggered-alerts-list" class="list">
+                    <p class="empty-state">No alerts triggered yet.</p>
+                </div>
+            </section>
+
+            <section class="card card-full">
                 <h2>👥 Registered Users</h2>
                 <div id="users-list" class="list">
                     <p class="empty-state">No users registered yet.</p>

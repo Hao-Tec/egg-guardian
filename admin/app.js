@@ -8,6 +8,7 @@ const API_BASE = 'http://localhost:8000/api/v1';
 let devices = [];
 let alertRules = [];
 let users = [];
+let triggeredAlerts = [];
 let authToken = localStorage.getItem('admin_token');
 let currentUser = null;
 
@@ -18,6 +19,7 @@ const devicesList = document.getElementById('devices-list');
 const alertsList = document.getElementById('alerts-list');
 const alertDeviceSelect = document.getElementById('alert-device');
 const usersList = document.getElementById('users-list');
+const triggeredAlertsList = document.getElementById('triggered-alerts-list');
 const loginScreen = document.getElementById('login-screen');
 const adminPanel = document.getElementById('admin-panel');
 const loginForm = document.getElementById('login-form');
@@ -75,6 +77,7 @@ function showAdminPanel() {
     fetchDevices();
     fetchAlertRules();
     fetchUsers();
+    fetchTriggeredAlerts();
 }
 
 async function login(email, password) {
@@ -297,6 +300,99 @@ async function fetchUsers() {
         console.error('Failed to fetch users:', error);
         users = [];
         renderUsers();
+    }
+}
+
+// ============== Triggered Alerts ==============
+
+// Render triggered alerts
+function renderTriggeredAlerts() {
+    if (triggeredAlerts.length === 0) {
+        triggeredAlertsList.innerHTML = '<p class="empty-state">No alerts triggered yet. 🎉</p>';
+        return;
+    }
+    
+    triggeredAlertsList.innerHTML = triggeredAlerts.map(alert => {
+        const device = devices.find(d => d.id === alert.device_id);
+        const deviceName = device ? device.name : `Device #${alert.device_id}`;
+        const time = new Date(alert.triggered_at).toLocaleString();
+        const alertClass = alert.is_acknowledged ? 'acknowledged' : 'unacknowledged';
+        const icon = alert.alert_type === 'high' ? '🔥' : '❄️';
+        
+        return `
+            <div class="alert-item ${alertClass}">
+                <div class="alert-info">
+                    <div class="alert-header">
+                        <span class="alert-icon">${icon}</span>
+                        <span class="alert-type ${alert.alert_type}">${alert.alert_type.toUpperCase()}</span>
+                        <span class="alert-device">${deviceName}</span>
+                    </div>
+                    <div class="alert-message">${alert.message}</div>
+                    <div class="alert-time">${time}</div>
+                </div>
+                <div class="alert-actions">
+                    ${!alert.is_acknowledged ? 
+                        `<button class="btn btn-small" onclick="acknowledgeAlert(${alert.id})">✓ Acknowledge</button>` : 
+                        '<span class="acknowledged-badge">✓ Acknowledged</span>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Fetch triggered alerts from API
+async function fetchTriggeredAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/alerts`);
+        if (response.ok) {
+            triggeredAlerts = await response.json();
+            renderTriggeredAlerts();
+        }
+    } catch (error) {
+        console.error('Failed to fetch alerts:', error);
+        triggeredAlerts = [];
+        renderTriggeredAlerts();
+    }
+}
+
+// Acknowledge a single alert
+async function acknowledgeAlert(alertId) {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            showToast('Alert acknowledged!');
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to acknowledge alert', true);
+        }
+    } catch (error) {
+        console.error('Acknowledge failed:', error);
+        showToast('Failed to acknowledge alert', true);
+    }
+}
+
+// Acknowledge all alerts
+async function acknowledgeAllAlerts() {
+    try {
+        const response = await fetch(`${API_BASE}/alerts/acknowledge-all`, {
+            method: 'PATCH',
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`${result.acknowledged} alerts acknowledged!`);
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to acknowledge alerts', true);
+        }
+    } catch (error) {
+        console.error('Acknowledge all failed:', error);
+        showToast('Failed to acknowledge alerts', true);
     }
 }
 
