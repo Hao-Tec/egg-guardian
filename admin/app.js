@@ -79,8 +79,8 @@ function showAdminPanel() {
     fetchUsers();
     fetchTriggeredAlerts();
     
-    // Start auto-refresh for alerts
-    startAlertsAutoRefresh();
+    // Start auto-refresh for all data
+    startDataAutoRefresh();
 }
 
 async function login(email, password) {
@@ -107,7 +107,7 @@ async function login(email, password) {
 }
 
 function logout() {
-    stopAlertsAutoRefresh();
+    stopDataAutoRefresh();
     authToken = null;
     currentUser = null;
     localStorage.removeItem('admin_token');
@@ -365,19 +365,24 @@ async function fetchTriggeredAlerts() {
     }
 }
 
-// Start auto-refresh for alerts
-function startAlertsAutoRefresh() {
-    if (alertsRefreshInterval) clearInterval(alertsRefreshInterval);
-    alertsRefreshInterval = setInterval(() => {
-        fetchTriggeredAlerts();
+// Start auto-refresh for all data
+let dataRefreshInterval = null;
+
+function startDataAutoRefresh() {
+    if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+    dataRefreshInterval = setInterval(() => {
+        fetchDevices();          // Refresh devices
+        fetchAlertRules();       // Refresh alert rules
+        fetchTriggeredAlerts();  // Refresh triggered alerts
+        // Note: Not refreshing users as it's less dynamic
     }, 5000); // Refresh every 5 seconds
 }
 
 // Stop auto-refresh
-function stopAlertsAutoRefresh() {
-    if (alertsRefreshInterval) {
-        clearInterval(alertsRefreshInterval);
-        alertsRefreshInterval = null;
+function stopDataAutoRefresh() {
+    if (dataRefreshInterval) {
+        clearInterval(dataRefreshInterval);
+        dataRefreshInterval = null;
     }
 }
 
