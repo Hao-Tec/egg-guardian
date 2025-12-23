@@ -442,7 +442,7 @@ async function clearAcknowledgedAlerts() {
         
         if (response.ok) {
             const result = await response.json();
-            showToast(`${result.deleted} old alerts cleared!`);
+            showToast(`${result.deleted} acknowledged alerts cleared!`);
             await fetchTriggeredAlerts();
         } else {
             const error = await response.json();
@@ -451,6 +451,31 @@ async function clearAcknowledgedAlerts() {
     } catch (error) {
         console.error('Clear alerts failed:', error);
         showToast('Failed to clear alerts', true);
+    }
+}
+
+// Delete ALL alerts (with confirmation)
+async function deleteAllAlerts() {
+    const confirmed = confirm('⚠️ DELETE ALL ALERTS?\n\nThis will permanently delete ALL triggered alerts (including unacknowledged ones).\n\nThis action cannot be undone.');
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/alerts/delete-all`, {
+            method: 'DELETE',
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`${result.deleted} alerts deleted!`);
+            await fetchTriggeredAlerts();
+        } else {
+            const error = await response.json();
+            showToast(error.detail || 'Failed to delete alerts', true);
+        }
+    } catch (error) {
+        console.error('Delete all alerts failed:', error);
+        showToast('Failed to delete alerts', true);
     }
 }
 

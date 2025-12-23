@@ -126,3 +126,19 @@ async def clear_acknowledged_alerts(
     
     await db.flush()
     return {"deleted": count}
+
+
+@router.delete("/delete-all", status_code=status.HTTP_200_OK)
+async def delete_all_alerts(
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete ALL alerts (acknowledged and unacknowledged)."""
+    result = await db.execute(select(Alert))
+    alerts = result.scalars().all()
+    
+    count = len(alerts)
+    for alert in alerts:
+        await db.delete(alert)
+    
+    await db.flush()
+    return {"deleted": count}
