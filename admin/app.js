@@ -454,7 +454,7 @@ function startDataAutoRefresh() {
         fetchDevices();          // Refresh devices
         fetchAlertRules();       // Refresh alert rules
         fetchTriggeredAlerts();  // Refresh triggered alerts
-        // Note: Not refreshing users as it's less dynamic
+        fetchUsers();            // Refresh users list
     }, 5000); // Refresh every 5 seconds
 }
 
@@ -754,6 +754,7 @@ async function handleConfirm() {
         try {
             const response = await fetch(`${API_BASE}/users/${pendingDeleteUserId}`, {
                 method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken}` }
             });
             
             if (response.ok || response.status === 204) {
@@ -779,6 +780,7 @@ async function handleConfirm() {
         try {
             const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}`, {
                 method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken}` }
             });
             
             if (response.ok || response.status === 204) {
