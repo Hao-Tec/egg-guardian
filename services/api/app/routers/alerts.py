@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import Alert, Device
+from app.models import Alert, Device, User
 from app.schemas import AlertResponse
+from app.services.deps import get_current_user
 
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
@@ -23,7 +24,7 @@ async def list_alerts(
     query = select(Alert).order_by(Alert.triggered_at.desc()).limit(limit)
     if unacknowledged_only:
         query = query.where(Alert.is_acknowledged == False)
-    
+
     result = await db.execute(query)
     alerts = result.scalars().all()
     return alerts
@@ -58,7 +59,7 @@ async def acknowledge_alert(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Alert not found",
         )
-    
+
     alert.is_acknowledged = True
     alert.acknowledged_at = datetime.now(timezone.utc)
     await db.flush()
@@ -71,16 +72,14 @@ async def acknowledge_all_alerts(
     db: AsyncSession = Depends(get_db),
 ):
     """Acknowledge all unacknowledged alerts."""
-    result = await db.execute(
-        select(Alert).where(Alert.is_acknowledged == False)
-    )
+    result = await db.execute(select(Alert).where(Alert.is_acknowledged == False))
     alerts = result.scalars().all()
-    
+
     now = datetime.now(timezone.utc)
     for alert in alerts:
         alert.is_acknowledged = True
         alert.acknowledged_at = now
-    
+
     await db.flush()
     return {"acknowledged": len(alerts)}
 
@@ -99,7 +98,7 @@ async def list_device_alerts(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
-    
+
     result = await db.execute(
         select(Alert)
         .where(Alert.device_id == device_id)
@@ -113,17 +112,16 @@ async def list_device_alerts(
 @router.delete("/clear-acknowledged", status_code=status.HTTP_200_OK)
 async def clear_acknowledged_alerts(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Delete all acknowledged alerts to clean up history."""
-    result = await db.execute(
-        select(Alert).where(Alert.is_acknowledged == True)
-    )
+    """Delete all acknowledged alerts (authenticated)."""
+    result = await db.execute(select(Alert).where(Alert.is_acknowledged == True))
     alerts = result.scalars().all()
-    
+
     count = len(alerts)
     for alert in alerts:
         await db.delete(alert)
-    
+
     await db.flush()
     return {"deleted": count}
 
@@ -131,14 +129,15 @@ async def clear_acknowledged_alerts(
 @router.delete("/delete-all", status_code=status.HTTP_200_OK)
 async def delete_all_alerts(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Delete ALL alerts (acknowledged and unacknowledged)."""
+    """Delete ALL alerts (authenticated)."""
     result = await db.execute(select(Alert))
     alerts = result.scalars().all()
-    
+
     count = len(alerts)
     for alert in alerts:
         await db.delete(alert)
-    
+
     await db.flush()
     return {"deleted": count}

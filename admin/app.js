@@ -19,6 +19,13 @@ let sessionTimeoutId = null;
 let inactivityTimeoutId = null;
 let loginTimestamp = localStorage.getItem('admin_login_time');
 
+// Security: HTML escape to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // DOM elements
 const deviceForm = document.getElementById('device-form');
 const alertForm = document.getElementById('alert-form');
@@ -289,25 +296,15 @@ async function fetchDevices() {
     }
 }
 
-// Fetch alert rules from API (for all devices)
+// Fetch alert rules from API (bulk fetch - single request for all devices)
 async function fetchAlertRules() {
     try {
-        // Alert rules are per-device, so we need to fetch for each device
-        alertRules = [];
-        for (const device of devices) {
-            try {
-                const response = await fetch(`${API_BASE}/devices/${device.id}/rules`);
-                if (response.ok) {
-                    const rules = await response.json();
-                    // Add device name to each rule for display
-                    rules.forEach(rule => {
-                        rule.device_name = device.name;
-                    });
-                    alertRules = alertRules.concat(rules);
-                }
-            } catch (e) {
-                console.error(`Failed to fetch rules for device ${device.id}:`, e);
-            }
+        // Use bulk endpoint to avoid N+1 queries
+        const response = await fetch(`${API_BASE}/devices/rules/all`);
+        if (response.ok) {
+            alertRules = await response.json();
+        } else {
+            alertRules = [];
         }
         renderAlertRules();
     } catch (error) {
@@ -328,10 +325,10 @@ function renderUsers() {
         <div class="list-item">
             <div>
                 <div class="name">
-                    ${user.email}
+                    ${escapeHtml(user.email)}
                     ${user.is_superuser ? '<span class="role-badge admin">Admin</span>' : '<span class="role-badge user">User</span>'}
                 </div>
-                <div class="meta">${user.full_name || 'No name'} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
+                <div class="meta">${escapeHtml(user.full_name || 'No name')} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <button class="btn-toggle ${user.is_superuser ? 'active' : ''}" 
@@ -339,7 +336,7 @@ function renderUsers() {
                         title="${user.is_superuser ? 'Remove admin' : 'Make admin'}">
                     ${user.is_superuser ? '👑 Admin' : '🔓 Make Admin'}
                 </button>
-                <button class="delete-btn" onclick="deleteUser(${user.id}, '${user.email}')" title="Delete user">🗑️</button>
+                <button class="delete-btn" onclick="deleteUser(${user.id}, '${escapeHtml(user.email)}')" title="Delete user">🗑️</button>
             </div>
         </div>
     `).join('');
@@ -350,6 +347,7 @@ async function toggleAdminStatus(userId) {
     try {
         const response = await fetch(`${API_BASE}/users/${userId}/toggle-admin`, {
             method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
         if (response.ok) {
@@ -366,12 +364,18 @@ async function toggleAdminStatus(userId) {
     }
 }
 
-// Fetch users from API
+// Fetch users from API (requires admin auth)
 async function fetchUsers() {
     try {
-        const response = await fetch(`${API_BASE}/users`);
+        const response = await fetch(`${API_BASE}/users`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
         if (response.ok) {
             users = await response.json();
+            renderUsers();
+        } else if (response.status === 401 || response.status === 403) {
+            console.warn('Not authorized to fetch users');
+            users = [];
             renderUsers();
         }
     } catch (error) {
@@ -512,6 +516,7 @@ async function clearAcknowledgedAlerts() {
     try {
         const response = await fetch(`${API_BASE}/alerts/clear-acknowledged`, {
             method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
         if (response.ok) {
@@ -540,6 +545,7 @@ async function confirmDeleteAllAlerts() {
     try {
         const response = await fetch(`${API_BASE}/alerts/delete-all`, {
             method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
         if (response.ok) {

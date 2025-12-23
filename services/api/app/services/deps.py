@@ -62,3 +62,15 @@ async def get_optional_user(
         return None
 
     return await get_user_by_id(db, user_id)
+
+
+async def get_current_superuser(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Get current user and verify they are a superuser (admin)."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return current_user

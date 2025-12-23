@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_url: str = "postgresql+asyncpg://egg_guardian:egg_guardian_secret@localhost:5432/egg_guardian"
+    database_url: str = (
+        "postgresql+asyncpg://egg_guardian:egg_guardian_secret@localhost:5432/egg_guardian"
+    )
 
     # MQTT
     mqtt_broker: str = "localhost"
@@ -24,7 +26,7 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    debug: bool = True
+    debug: bool = False
 
     # FCM
     fcm_mock_mode: bool = True

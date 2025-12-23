@@ -17,7 +17,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -39,11 +41,15 @@ class Device(Base):
     __tablename__ = "devices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    device_id: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    device_id: Mapped[str] = mapped_column(
+        String(50), unique=True, index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    owner_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -68,9 +74,17 @@ class Telemetry(Base):
     """Temperature telemetry data from devices."""
 
     __tablename__ = "telemetry"
+    __table_args__ = (
+        # Composite index for common queries: get telemetry by device, ordered by time
+        {
+            "comment": "Temperature readings with device+time index for efficient queries"
+        },
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    device_id: Mapped[int] = mapped_column(Integer, ForeignKey("devices.id"), nullable=False)
+    device_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("devices.id"), nullable=False, index=True
+    )
     temp_c: Mapped[float] = mapped_column(Float, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -89,7 +103,9 @@ class AlertRule(Base):
     __tablename__ = "alert_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    device_id: Mapped[int] = mapped_column(Integer, ForeignKey("devices.id"), nullable=False)
+    device_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("devices.id"), nullable=False
+    )
     temp_min: Mapped[float] = mapped_column(Float, nullable=False, default=35.0)
     temp_max: Mapped[float] = mapped_column(Float, nullable=False, default=39.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -107,12 +123,18 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    device_id: Mapped[int] = mapped_column(Integer, ForeignKey("devices.id"), nullable=False)
-    rule_id: Mapped[int] = mapped_column(Integer, ForeignKey("alert_rules.id"), nullable=False)
+    device_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("devices.id"), nullable=False, index=True
+    )
+    rule_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("alert_rules.id"), nullable=False
+    )
     temp_c: Mapped[float] = mapped_column(Float, nullable=False)
-    alert_type: Mapped[str] = mapped_column(String(20), nullable=False)  # "high" or "low"
+    alert_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # "high" or "low"
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    is_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     triggered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
