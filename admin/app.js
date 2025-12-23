@@ -351,8 +351,8 @@ let alertsRefreshInterval = null;
 async function fetchTriggeredAlerts() {
     try {
         const url = showAcknowledged 
-            ? `${API_BASE}/alerts?limit=50` 
-            : `${API_BASE}/alerts?unacknowledged_only=true&limit=20`;
+            ? `${API_BASE}/alerts?limit=200` 
+            : `${API_BASE}/alerts?unacknowledged_only=true&limit=100`;
         const response = await fetch(url);
         if (response.ok) {
             triggeredAlerts = await response.json();
