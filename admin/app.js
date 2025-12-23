@@ -501,7 +501,7 @@ async function acknowledgeAllAlerts() {
         
         if (response.ok) {
             const result = await response.json();
-            showToast(`${result.acknowledged} alerts acknowledged!`);
+            showToast(`${result.acknowledged} alert${result.acknowledged === 1 ? '' : 's'} acknowledged!`);
             await fetchTriggeredAlerts();
         } else {
             const error = await response.json();
@@ -523,7 +523,7 @@ async function clearAcknowledgedAlerts() {
         
         if (response.ok) {
             const result = await response.json();
-            showToast(`${result.deleted} acknowledged alerts cleared!`);
+            showToast(`${result.deleted} acknowledged alert${result.deleted === 1 ? '' : 's'} cleared!`);
             await fetchTriggeredAlerts();
         } else {
             const error = await response.json();
@@ -552,7 +552,7 @@ async function confirmDeleteAllAlerts() {
         
         if (response.ok) {
             const result = await response.json();
-            showToast(`${result.deleted} alerts deleted!`);
+            showToast(`${result.deleted} alert${result.deleted === 1 ? '' : 's'} deleted!`);
             await fetchTriggeredAlerts();
         } else {
             const error = await response.json();
