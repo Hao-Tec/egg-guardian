@@ -68,7 +68,7 @@ async def create_default_admin() -> None:
 
         # Create default admin
         admin = User(
-            email="admin@eggguardian.local",
+            email="admin@eggguardian.com",
             hashed_password=get_password_hash("admin123"),
             full_name="Default Admin",
             is_active=True,
@@ -76,4 +76,4 @@ async def create_default_admin() -> None:
         )
         session.add(admin)
         await session.commit()
-        logger.info("✅ Created default admin: admin@eggguardian.local / admin123")
+        logger.info("✅ Created default admin: admin@eggguardian.com / admin123")
