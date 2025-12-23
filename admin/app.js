@@ -454,11 +454,14 @@ async function clearAcknowledgedAlerts() {
     }
 }
 
-// Delete ALL alerts (with confirmation)
-async function deleteAllAlerts() {
-    const confirmed = confirm('⚠️ DELETE ALL ALERTS?\n\nThis will permanently delete ALL triggered alerts (including unacknowledged ones).\n\nThis action cannot be undone.');
-    
-    if (!confirmed) return;
+// Delete ALL alerts (show custom modal)
+function deleteAllAlerts() {
+    document.getElementById('delete-all-modal').classList.remove('hidden');
+}
+
+// Actually delete all alerts after confirmation
+async function confirmDeleteAllAlerts() {
+    document.getElementById('delete-all-modal').classList.add('hidden');
     
     try {
         const response = await fetch(`${API_BASE}/alerts/delete-all`, {
@@ -477,6 +480,11 @@ async function deleteAllAlerts() {
         console.error('Delete all alerts failed:', error);
         showToast('Failed to delete alerts', true);
     }
+}
+
+// Cancel delete all
+function cancelDeleteAll() {
+    document.getElementById('delete-all-modal').classList.add('hidden');
 }
 
 // Delete a user
@@ -713,3 +721,7 @@ async function handleConfirm() {
     pendingDeleteUserEmail = null;
 }
 document.getElementById('modal-confirm').addEventListener('click', handleConfirm);
+
+// Delete All Modal listeners
+document.getElementById('delete-all-confirm').addEventListener('click', confirmDeleteAllAlerts);
+document.getElementById('delete-all-cancel').addEventListener('click', cancelDeleteAll);
