@@ -825,3 +825,46 @@ footer a:hover {
         transform: translateY(0) scale(1);
     }
 }
+
+/* Danger Modal */
+.modal-danger {
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 60px rgba(239, 68, 68, 0.15);
+}
+
+.modal-danger .modal-icon {
+    font-size: 4rem;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: rotate(0); }
+    20% { transform: rotate(-10deg); }
+    40% { transform: rotate(10deg); }
+    60% { transform: rotate(-10deg); }
+    80% { transform: rotate(10deg); }
+}
+
+.modal-warning {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.btn-modal-delete-all {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: white;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 4px 25px rgba(239, 68, 68, 0.6); }
+}
+
+.btn-modal-delete-all:hover {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    box-shadow: 0 6px 25px rgba(239, 68, 68, 0.5);
+}

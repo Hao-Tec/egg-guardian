@@ -150,6 +150,23 @@
         </div>
     </div>
 
+    <!-- Delete All Alerts Modal -->
+    <div id="delete-all-modal" class="modal-overlay hidden">
+        <div class="modal modal-danger">
+            <div class="modal-icon">🚨</div>
+            <h3 class="modal-title">Delete ALL Alerts?</h3>
+            <p class="modal-message">
+                This will <strong>permanently delete</strong> all triggered alerts, 
+                including unacknowledged ones.<br><br>
+                <span class="modal-warning">⚠️ This action cannot be undone!</span>
+            </p>
+            <div class="modal-buttons">
+                <button id="delete-all-cancel" class="btn-modal btn-modal-cancel">Cancel</button>
+                <button id="delete-all-confirm" class="btn-modal btn-modal-delete-all">Delete All</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

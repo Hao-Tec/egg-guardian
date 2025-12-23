@@ -12,6 +12,13 @@ let triggeredAlerts = [];
 let authToken = localStorage.getItem('admin_token');
 let currentUser = null;
 
+// Session security
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity
+let sessionTimeoutId = null;
+let inactivityTimeoutId = null;
+let loginTimestamp = localStorage.getItem('admin_login_time');
+
 // DOM elements
 const deviceForm = document.getElementById('device-form');
 const alertForm = document.getElementById('alert-form');
@@ -32,6 +39,12 @@ const logoutBtn = document.getElementById('logout-btn');
 async function checkAuth() {
     if (!authToken) {
         showLogin();
+        return false;
+    }
+    
+    // Check if session has expired (page was left open too long)
+    if (checkSessionExpiry()) {
+        logout(true);
         return false;
     }
     
@@ -73,6 +86,9 @@ function showAdminPanel() {
     adminPanel.classList.remove('hidden');
     adminEmail.textContent = `👤 ${currentUser?.email || 'Admin'}`;
     
+    // Start session security
+    startSession();
+    
     // Load data
     fetchDevices();
     fetchAlertRules();
@@ -106,12 +122,70 @@ async function login(email, password) {
     }
 }
 
-function logout() {
+function logout(showExpiredMessage = false) {
     stopDataAutoRefresh();
+    stopSessionTimers();
     authToken = null;
     currentUser = null;
     localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_login_time');
     showLogin();
+    
+    if (showExpiredMessage) {
+        showToast('Session expired. Please login again.', true);
+    }
+}
+
+// Session security functions
+function startSession() {
+    loginTimestamp = Date.now();
+    localStorage.setItem('admin_login_time', loginTimestamp);
+    
+    // Set absolute session timeout (30 minutes from login)
+    sessionTimeoutId = setTimeout(() => {
+        console.log('Session timeout reached');
+        logout(true);
+    }, SESSION_TIMEOUT_MS);
+    
+    // Start inactivity timer
+    resetActivityTimer();
+    
+    // Add activity listeners
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+        document.addEventListener(event, resetActivityTimer);
+    });
+}
+
+function resetActivityTimer() {
+    if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
+    
+    inactivityTimeoutId = setTimeout(() => {
+        console.log('Inactivity timeout reached');
+        logout(true);
+    }, INACTIVITY_TIMEOUT_MS);
+}
+
+function stopSessionTimers() {
+    if (sessionTimeoutId) {
+        clearTimeout(sessionTimeoutId);
+        sessionTimeoutId = null;
+    }
+    if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+        inactivityTimeoutId = null;
+    }
+    
+    // Remove activity listeners
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+        document.removeEventListener(event, resetActivityTimer);
+    });
+}
+
+function checkSessionExpiry() {
+    if (!loginTimestamp) return false;
+    
+    const elapsed = Date.now() - parseInt(loginTimestamp);
+    return elapsed > SESSION_TIMEOUT_MS;
 }
 
 // Login form handler
@@ -126,7 +200,7 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 // Logout handler
-logoutBtn.addEventListener('click', logout);
+logoutBtn.addEventListener('click', () => logout(false));
 
 // Password visibility toggle
 document.getElementById('toggle-password').addEventListener('click', function() {
@@ -454,11 +528,14 @@ async function clearAcknowledgedAlerts() {
     }
 }
 
-// Delete ALL alerts (with confirmation)
-async function deleteAllAlerts() {
-    const confirmed = confirm('⚠️ DELETE ALL ALERTS?\n\nThis will permanently delete ALL triggered alerts (including unacknowledged ones).\n\nThis action cannot be undone.');
-    
-    if (!confirmed) return;
+// Delete ALL alerts (show custom modal)
+function deleteAllAlerts() {
+    document.getElementById('delete-all-modal').classList.remove('hidden');
+}
+
+// Actually delete all alerts after confirmation
+async function confirmDeleteAllAlerts() {
+    document.getElementById('delete-all-modal').classList.add('hidden');
     
     try {
         const response = await fetch(`${API_BASE}/alerts/delete-all`, {
@@ -477,6 +554,11 @@ async function deleteAllAlerts() {
         console.error('Delete all alerts failed:', error);
         showToast('Failed to delete alerts', true);
     }
+}
+
+// Cancel delete all
+function cancelDeleteAll() {
+    document.getElementById('delete-all-modal').classList.add('hidden');
 }
 
 // Delete a user
@@ -713,3 +795,7 @@ async function handleConfirm() {
     pendingDeleteUserEmail = null;
 }
 document.getElementById('modal-confirm').addEventListener('click', handleConfirm);
+
+// Delete All Modal listeners
+document.getElementById('delete-all-confirm').addEventListener('click', confirmDeleteAllAlerts);
+document.getElementById('delete-all-cancel').addEventListener('click', cancelDeleteAll);
