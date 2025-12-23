@@ -125,7 +125,9 @@ async function login(email, password) {
         
         await checkAuth();
     } catch (error) {
-        loginError.textContent = error.message;
+        // Handle both Error objects and plain strings
+        const message = error.message || (typeof error === 'string' ? error : 'Login failed');
+        loginError.textContent = message;
     }
 }
 
