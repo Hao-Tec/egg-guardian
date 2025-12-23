@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:egg_guardian/services/api_service.dart';
+import 'package:egg_guardian/services/session_service.dart';
 
 /// Login screen with email/password authentication.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? sessionExpiredMessage;
+
+  const LoginScreen({super.key, this.sessionExpiredMessage});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,6 +20,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isRegister = false;
   bool _obscurePassword = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Show session expired message if provided
+    if (widget.sessionExpiredMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.sessionExpiredMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -39,6 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
         await api.register(_emailController.text, _passwordController.text);
       }
       await api.login(_emailController.text, _passwordController.text);
+
+      // Start session tracking
+      SessionService().startSession();
+
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/devices');
       }
