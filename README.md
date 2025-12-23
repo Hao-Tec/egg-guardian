@@ -234,8 +234,9 @@ python scripts/simulate_devices.py --count 3 --rate 2 --duration 30 --prefix TES
 
 ### Managing Alerts
 - **Acknowledge**: Mark alerts as seen
-- **Acknowledge All**: Clear all unacknowledged
-- **Clear Old**: Permanently delete acknowledged alerts
+- **Acknowledge All**: Mark all as seen
+- **Clear Acknowledged**: Delete acknowledged alerts only
+- **Delete All**: Permanently delete ALL alerts (with confirmation)
 
 ## 🔒 Security Features
 
@@ -250,5 +251,7 @@ python scripts/simulate_devices.py --count 3 --rate 2 --duration 30 --prefix TES
 MIT License - See LICENSE file
 
 ## 👨‍💻 Author
+
+**AbdulWaheed Habeeb**
 
 Egg Guardian MVP - Final Year Project
