@@ -109,8 +109,9 @@ async def update_device(
 async def delete_device(
     device_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Delete a device (public for MVP demo)."""
+    """Delete a device (authenticated)."""
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     if not device:
@@ -123,6 +124,32 @@ async def delete_device(
 
 
 # ============== Alert Rules ==============
+
+
+@router.get("/rules/all", response_model=list[AlertRuleResponse])
+async def list_all_rules(
+    db: AsyncSession = Depends(get_db),
+):
+    """List all alert rules across all devices (bulk fetch to avoid N+1)."""
+    result = await db.execute(
+        select(AlertRule, Device.name)
+        .join(Device, AlertRule.device_id == Device.id)
+        .order_by(Device.name, AlertRule.id)
+    )
+    rules = []
+    for rule, device_name in result.all():
+        rule_dict = {
+            "id": rule.id,
+            "device_id": rule.device_id,
+            "temp_min": rule.temp_min,
+            "temp_max": rule.temp_max,
+            "is_active": rule.is_active,
+            "created_at": rule.created_at,
+            "device_name": device_name,
+        }
+        rules.append(rule_dict)
+    return rules
+
 
 @router.get("/{device_id}/rules", response_model=list[AlertRuleResponse])
 async def list_device_rules(
@@ -138,13 +165,15 @@ async def list_device_rules(
             detail="Device not found",
         )
 
-    result = await db.execute(
-        select(AlertRule).where(AlertRule.device_id == device_id)
-    )
+    result = await db.execute(select(AlertRule).where(AlertRule.device_id == device_id))
     return result.scalars().all()
 
 
-@router.post("/{device_id}/rules", response_model=AlertRuleResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{device_id}/rules",
+    response_model=AlertRuleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_device_rule(
     device_id: int,
     rule_data: AlertRuleCreate,

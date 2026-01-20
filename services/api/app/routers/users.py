@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import User
 from app.schemas import UserResponse
+from app.services.deps import get_current_superuser
 
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
@@ -15,8 +16,9 @@ router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 @router.get("", response_model=list[UserResponse])
 async def list_users(
     db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
 ):
-    """List all registered users (admin)."""
+    """List all registered users (admin only)."""
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
     return users
@@ -26,6 +28,7 @@ async def list_users(
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
 ):
     """Get a specific user by ID."""
     result = await db.execute(select(User).where(User.id == user_id))
@@ -42,8 +45,9 @@ async def get_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
 ):
-    """Delete a user (admin). Cannot delete the last admin."""
+    """Delete a user (admin only). Cannot delete the last admin."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -54,9 +58,7 @@ async def delete_user(
 
     # Protect last admin
     if user.is_superuser:
-        admin_count = await db.execute(
-            select(User).where(User.is_superuser == True)
-        )
+        admin_count = await db.execute(select(User).where(User.is_superuser == True))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -70,8 +72,9 @@ async def delete_user(
 async def toggle_admin_status(
     user_id: int,
     db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
 ):
-    """Toggle admin (superuser) status for a user. Cannot demote the last admin."""
+    """Toggle admin (superuser) status for a user (admin only). Cannot demote the last admin."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -82,9 +85,7 @@ async def toggle_admin_status(
 
     # Protect last admin from being demoted
     if user.is_superuser:
-        admin_count = await db.execute(
-            select(User).where(User.is_superuser == True)
-        )
+        admin_count = await db.execute(select(User).where(User.is_superuser == True))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
