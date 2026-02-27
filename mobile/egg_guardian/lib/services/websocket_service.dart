@@ -11,7 +11,6 @@ class WebSocketService {
   StreamController<WsMessage>? _controller;
   String? _currentDeviceId;
   Timer? _reconnectTimer;
-  bool _isConnecting = false;
 
   /// Stream of WebSocket messages.
   Stream<WsMessage>? get messageStream => _controller?.stream;
@@ -28,7 +27,7 @@ class WebSocketService {
     await disconnect();
 
     _currentDeviceId = deviceId;
-    _isConnecting = true;
+
     _controller = StreamController<WsMessage>.broadcast();
 
     try {
@@ -59,11 +58,10 @@ class WebSocketService {
         },
       );
 
-      _isConnecting = false;
       debugPrint('WebSocket connected to $deviceId');
     } catch (e) {
       debugPrint('WS connect error: $e');
-      _isConnecting = false;
+
       _scheduleReconnect();
     }
   }

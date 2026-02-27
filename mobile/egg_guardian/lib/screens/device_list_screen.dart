@@ -90,9 +90,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
               await ApiService().logout();
-              if (mounted) {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
+              if (!context.mounted) return;
+              Navigator.pushReplacementNamed(context, '/login');
             },
           ),
         ],
@@ -184,8 +183,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   color: device.isActive
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.2),
+                      ? Colors.green.withValues(alpha: 0.2)
+                      : Colors.grey.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -229,8 +228,8 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: device.isActive
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.grey.withOpacity(0.2),
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.grey.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -318,11 +317,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                 );
                 _loadDevices();
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),

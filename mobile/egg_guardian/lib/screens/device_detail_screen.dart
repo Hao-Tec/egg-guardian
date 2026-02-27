@@ -220,12 +220,14 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            _getTempColor(_currentTemp).withOpacity(0.3),
-            _getTempColor(_currentTemp).withOpacity(0.1),
+            _getTempColor(_currentTemp).withValues(alpha: 0.3),
+            _getTempColor(_currentTemp).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _getTempColor(_currentTemp).withOpacity(0.5)),
+        border: Border.all(
+          color: _getTempColor(_currentTemp).withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         children: [
@@ -262,7 +264,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _getTempColor(_currentTemp).withOpacity(0.2),
+              color: _getTempColor(_currentTemp).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -366,7 +368,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                         drawVerticalLine: false,
                         horizontalInterval: 1,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: Colors.grey.withOpacity(0.2),
+                          color: Colors.grey.withValues(alpha: 0.2),
                           strokeWidth: 1,
                         ),
                       ),
@@ -408,7 +410,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                             ),
                           ],
                           isCurved: false,
-                          color: Colors.green.withOpacity(0.3),
+                          color: Colors.green.withValues(alpha: 0.3),
                           barWidth: 0,
                           belowBarData: BarAreaData(show: false),
                           dotData: const FlDotData(show: false),
@@ -426,8 +428,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.amber.withOpacity(0.3),
-                                Colors.amber.withOpacity(0.0),
+                                Colors.amber.withValues(alpha: 0.3),
+                                Colors.amber.withValues(alpha: 0.0),
                               ],
                             ),
                           ),
@@ -456,9 +458,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.2),
+        color: Colors.red.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.5)),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
