@@ -50,7 +50,6 @@ services:
   - type: web
     name: egg-guardian-admin
     env: static
-    region: ohio
     plan: free
     buildCommand: ""
     staticPublishPath: "./admin"
