@@ -5,7 +5,7 @@
 
 const API_BASE = window.location.origin.includes('localhost') 
     ? 'http://localhost:8000/api/v1' 
-    : '/api/v1';
+    : 'https://egg-guardian-api.onrender.com/api/v1';
 
 // State
 let devices = [];
@@ -693,7 +693,7 @@ function setupWebSocket(dbId) {
     els.wsStatus.textContent = 'Connecting...';
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.origin.includes('localhost') ? 'localhost:8000' : window.location.host;
+    const wsHost = window.location.origin.includes('localhost') ? 'localhost:8000' : 'egg-guardian-api.onrender.com';
     ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/dashboard`);
     
     ws.onopen = () => {
