@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:egg_guardian/config.dart';
 import 'package:egg_guardian/models.dart';
 import 'package:egg_guardian/services/api_service.dart';
+import 'package:egg_guardian/services/websocket_service.dart';
+import 'package:egg_guardian/theme.dart';
 
-/// Device list screen showing all registered devices.
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
 
@@ -11,238 +15,154 @@ class DeviceListScreen extends StatefulWidget {
   State<DeviceListScreen> createState() => _DeviceListScreenState();
 }
 
-class _DeviceListScreenState extends State<DeviceListScreen> {
+class _DeviceListScreenState extends State<DeviceListScreen>
+    with WidgetsBindingObserver {
+  final WebSocketService _wsService = WebSocketService();
   List<Device> _devices = [];
+  final Map<String, double> _liveTemps = {};
   bool _isLoading = true;
+  bool _isAdmin = false;
   String? _error;
   Timer? _refreshTimer;
+  StreamSubscription? _wsSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAdminStatus();
     _loadDevices();
-    // Auto-refresh every 5 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _loadDevices(silent: true);
-    });
+    _startAutoRefresh();
+    _connectWebSocket();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _wsSub?.cancel();
+    _wsService.disconnect();
     super.dispose();
   }
 
-  Future<void> _loadDevices({bool silent = false}) async {
-    if (!silent) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    }
-
+  Future<void> _checkAdminStatus() async {
     try {
-      final api = ApiService();
-      final devices = await api.getDevices();
-      setState(() {
-        _devices = devices;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to load devices. Is the API running?';
-        _isLoading = false;
-      });
+      final user = await ApiService().getCurrentUser();
+      if (mounted) setState(() => _isAdmin = user.isSuperuser);
+    } catch (_) {}
+  }
+
+  Future<void> _connectWebSocket() async {
+    await _wsService.connect('all');
+    if (!mounted) return;
+    _wsSub?.cancel();
+    _wsSub = _wsService.messageStream.listen((msg) {
+      if (msg.type == 'telemetry' && mounted && msg.tempC != null) {
+        setState(() => _liveTemps[msg.deviceId] = msg.tempC!);
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    } else if (state == AppLifecycleState.resumed) {
+      _loadDevices();
+      _startAutoRefresh();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(AppConfig.deviceRefreshInterval, (_) {
+      _loadDevices(silent: true);
+    });
+  }
+
+  Future<void> _loadDevices({bool silent = false}) async {
+    if (!silent) setState(() { _isLoading = true; _error = null; });
+    try {
+      final devices = await ApiService().getDevices();
+      if (mounted) setState(() { _devices = devices; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _error = 'Unable to load devices.'; _isLoading = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Row(
-          children: [
-            const Text('🥚', style: TextStyle(fontSize: 24)),
-            const SizedBox(width: 8),
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Colors.amber, Colors.orange],
-              ).createShader(bounds),
-              child: const Text(
-                'Egg Guardian',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadDevices,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await ApiService().logout();
-              if (mounted) {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
-            },
-          ),
+      backgroundColor: EgTheme.bgBase,
+      body: Column(
+        children: [
+          _buildHeader(),
+          if (ApiService().isOfflineMode) _buildOfflineBanner(),
+          Expanded(child: _buildBody()),
         ],
       ),
-      body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddDeviceDialog,
-        backgroundColor: Colors.amber,
-        label: const Text('Add Device', style: TextStyle(color: Colors.black)),
-        icon: const Icon(Icons.add, color: Colors.black),
-      ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.amber),
-      );
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadDevices,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-              child: const Text('Retry'),
-            ),
-          ],
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D1627), Color(0xFF111D35)],
         ),
-      );
-    }
-
-    if (_devices.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.devices_other, color: Colors.grey[600], size: 64),
-            const SizedBox(height: 16),
-            Text(
-              'No devices registered',
-              style: TextStyle(color: Colors.grey[400], fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add a device or run the simulator',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadDevices,
-      color: Colors.amber,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _devices.length,
-        itemBuilder: (context, index) => _buildDeviceCard(_devices[index]),
+        border: Border(bottom: BorderSide(color: EgTheme.border)),
       ),
-    );
-  }
-
-  Widget _buildDeviceCard(Device device) {
-    return Card(
-      color: const Color(0xFF1E293B),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () {
-          Navigator.pushNamed(context, '/device', arguments: device);
-        },
-        borderRadius: BorderRadius.circular(16),
+      child: SafeArea(
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 12, 16, 16),
           child: Row(
             children: [
+              // Logo + title
               Container(
-                width: 56,
-                height: 56,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: device.isActive
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: EgTheme.accentGradient,
+                  borderRadius: EgTheme.r8,
                 ),
-                child: Center(
-                  child: Text(
-                    '🥚',
-                    style: TextStyle(
-                      fontSize: 28,
-                      color: device.isActive ? null : Colors.grey,
-                    ),
-                  ),
-                ),
+                child: const Icon(Icons.egg_outlined, color: Colors.black, size: 18),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      device.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      device.deviceId,
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
+                    Text('Egg Guardian', style: GoogleFonts.outfit(
+                      fontSize: 18, fontWeight: FontWeight.w700, color: EgTheme.textPrimary,
+                    )),
+                    Text('Incubator monitoring', style: EgTheme.body(12, color: EgTheme.textSecondary)),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              // Actions
+              Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: device.isActive
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.grey.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      device.isActive ? 'Active' : 'Inactive',
-                      style: TextStyle(
-                        color: device.isActive ? Colors.green : Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Icon(Icons.chevron_right, color: Colors.grey[600]),
+                  if (_isAdmin)
+                    _headerIconBtn(Icons.admin_panel_settings_outlined,
+                        tooltip: 'Admin Panel',
+                        onTap: () => Navigator.pushReplacementNamed(context, '/admin')),
+                  _headerIconBtn(Icons.refresh_rounded,
+                      tooltip: 'Refresh', onTap: _loadDevices),
+                  _headerIconBtn(Icons.logout_rounded,
+                      tooltip: 'Logout',
+                      onTap: () async {
+                        await ApiService().logout();
+                        if (mounted) Navigator.pushReplacementNamed(context, '/login');
+                      }),
                 ],
               ),
             ],
@@ -252,83 +172,214 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     );
   }
 
-  void _showAddDeviceDialog() {
-    final deviceIdController = TextEditingController();
-    final nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Add Device', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: deviceIdController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Device ID',
-                labelStyle: TextStyle(color: Colors.grey[400]),
-                hintText: 'e.g., eggpod-01',
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                filled: true,
-                fillColor: const Color(0xFF334155),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Name',
-                labelStyle: TextStyle(color: Colors.grey[400]),
-                hintText: 'e.g., Incubator A',
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                filled: true,
-                fillColor: const Color(0xFF334155),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
+  Widget _headerIconBtn(IconData icon, {required String tooltip, required VoidCallback onTap}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: EgTheme.r8,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: EgTheme.textSecondary, size: 22),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey[400])),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (deviceIdController.text.isEmpty ||
-                  nameController.text.isEmpty) {
-                return;
-              }
-              Navigator.pop(context);
-              try {
-                await ApiService().createDevice(
-                  deviceIdController.text,
-                  nameController.text,
-                );
-                _loadDevices();
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-            child: const Text('Add', style: TextStyle(color: Colors.black)),
-          ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+      color: EgTheme.warning.withOpacity(0.12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: EgTheme.warning, size: 14),
+          const SizedBox(width: 8),
+          Text('Offline — showing cached data',
+              style: EgTheme.body(12, color: EgTheme.warning, weight: FontWeight.w500)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: EgTheme.accent));
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: EgTheme.danger.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.signal_wifi_off_rounded, color: EgTheme.danger, size: 40),
+              ),
+              const SizedBox(height: 20),
+              Text('Connection Error', style: EgTheme.heading(18)),
+              const SizedBox(height: 8),
+              Text(_error!, style: EgTheme.body(14, color: EgTheme.textSecondary), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadDevices,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: EgTheme.bgCard,
+                  foregroundColor: EgTheme.textPrimary,
+                  side: const BorderSide(color: EgTheme.border),
+                  shape: const RoundedRectangleBorder(borderRadius: EgTheme.r12),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text('Retry', style: EgTheme.body(14, weight: FontWeight.w500)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_devices.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: EgTheme.bgCard,
+                  borderRadius: EgTheme.r24,
+                  border: Border.all(color: EgTheme.border),
+                ),
+                child: const Icon(Icons.devices_other_rounded, color: EgTheme.textMuted, size: 48),
+              ),
+              const SizedBox(height: 20),
+              Text('No devices yet', style: EgTheme.heading(18)),
+              const SizedBox(height: 8),
+              Text('Register a device from the admin panel\nor run the device simulator.',
+                  style: EgTheme.body(14, color: EgTheme.textSecondary), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadDevices,
+      color: EgTheme.accent,
+      backgroundColor: EgTheme.bgCard,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+        itemCount: _devices.length,
+        itemBuilder: (ctx, i) => _buildDeviceCard(_devices[i]),
+      ),
+    );
+  }
+
+  Widget _buildDeviceCard(Device device) {
+    final temp = _liveTemps[device.deviceId] ?? device.lastTemp;
+    final tColor = tempColor(temp, minTemp: device.tempMin, maxTemp: device.tempMax);
+    final isLive = _liveTemps.containsKey(device.deviceId);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, '/device', arguments: device),
+          borderRadius: EgTheme.r16,
+          child: Container(
+            decoration: EgTheme.card(),
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                // Status indicator container
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: tColor.withOpacity(0.1),
+                    borderRadius: EgTheme.r12,
+                    border: Border.all(color: tColor.withOpacity(0.25)),
+                  ),
+                  child: Icon(Icons.device_thermostat_rounded, color: tColor, size: 26),
+                ),
+                const SizedBox(width: 16),
+                // Name + ID
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(device.name,
+                          style: GoogleFonts.outfit(
+                              fontSize: 16, fontWeight: FontWeight.w600, color: EgTheme.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: device.isActive
+                                  ? (isLive ? EgTheme.success : EgTheme.textMuted)
+                                  : EgTheme.danger,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isLive ? 'Live' : (device.isActive ? 'Active' : 'Offline'),
+                            style: EgTheme.body(12, color: device.isActive
+                                ? (isLive ? EgTheme.success : EgTheme.textMuted)
+                                : EgTheme.danger),
+                          ),
+                          Text(' · ', style: EgTheme.body(12, color: EgTheme.textMuted)),
+                          Text(device.deviceId,
+                              style: EgTheme.body(12, color: EgTheme.textMuted),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Temperature
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (temp != null) ...[
+                      Text(
+                        '${temp.toStringAsFixed(1)}°C',
+                        style: GoogleFonts.outfit(
+                            fontSize: 22, fontWeight: FontWeight.w700, color: tColor),
+                      ),
+                      Text(tempStatus(temp, minTemp: device.tempMin, maxTemp: device.tempMax),
+                          style: EgTheme.body(11, color: tColor.withOpacity(0.8))),
+                    ] else
+                      Text('— °C',
+                          style: GoogleFonts.outfit(
+                              fontSize: 22, fontWeight: FontWeight.w700, color: EgTheme.textMuted)),
+                  ],
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded, color: EgTheme.textMuted, size: 20),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

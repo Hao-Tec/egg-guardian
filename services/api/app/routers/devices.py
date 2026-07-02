@@ -15,19 +15,59 @@ from app.schemas import (
     DeviceResponse,
     DeviceUpdate,
 )
-from app.services.deps import get_current_user, get_optional_user
+from app.services.deps import get_current_user
 
 router = APIRouter(prefix="/api/v1/devices", tags=["Devices"])
+
+
+def check_device_access(device: Device, current_user: User):
+    """Check if the current user has access to the device."""
+    if not current_user.is_superuser and device.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this device",
+        )
 
 
 @router.get("", response_model=list[DeviceResponse])
 async def list_devices(
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
 ):
-    """List all devices (public endpoint for MVP)."""
-    result = await db.execute(select(Device).order_by(Device.created_at.desc()))
+    """List all devices with their latest telemetry (authenticated)."""
+    from sqlalchemy import func
+    from app.models import Telemetry, AlertRule
+
+    if current_user.is_superuser:
+        query = select(Device).order_by(Device.created_at.desc())
+    else:
+        query = select(Device).where(Device.owner_id == current_user.id).order_by(Device.created_at.desc())
+
+    result = await db.execute(query)
     devices = result.scalars().all()
+
+    for device in devices:
+        telemetry_result = await db.execute(
+            select(Telemetry)
+            .where(Telemetry.device_id == device.id)
+            .order_by(Telemetry.recorded_at.desc())
+            .limit(1)
+        )
+        latest = telemetry_result.scalar_one_or_none()
+        if latest:
+            device.last_temp = latest.temp_c
+            device.last_recorded_at = latest.recorded_at
+
+        # Fetch active alert rule for threshold data
+        rule_result = await db.execute(
+            select(AlertRule)
+            .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+            .limit(1)
+        )
+        rule = rule_result.scalar_one_or_none()
+        device.temp_min = rule.temp_min if rule else 35.0
+        device.temp_max = rule.temp_max if rule else 39.0
+
     return devices
 
 
@@ -35,10 +75,9 @@ async def list_devices(
 async def create_device(
     device_data: DeviceCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Register a new device."""
-    # Check if device_id already exists
     existing = await db.execute(
         select(Device).where(Device.device_id == device_data.device_id)
     )
@@ -52,7 +91,7 @@ async def create_device(
         device_id=device_data.device_id,
         name=device_data.name,
         description=device_data.description,
-        owner_id=current_user.id if current_user else None,
+        owner_id=current_user.id,
     )
     db.add(device)
     await db.flush()
@@ -64,6 +103,7 @@ async def create_device(
 async def get_device(
     device_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific device by ID."""
     result = await db.execute(select(Device).where(Device.id == device_id))
@@ -73,6 +113,18 @@ async def get_device(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
+    check_device_access(device, current_user)
+    
+    from app.models import AlertRule
+    rule_result = await db.execute(
+        select(AlertRule)
+        .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+        .limit(1)
+    )
+    rule = rule_result.scalar_one_or_none()
+    device.temp_min = rule.temp_min if rule else 35.0
+    device.temp_max = rule.temp_max if rule else 39.0
+    
     return device
 
 
@@ -91,8 +143,8 @@ async def update_device(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
+    check_device_access(device, current_user)
 
-    # Update fields
     if device_data.name is not None:
         device.name = device_data.name
     if device_data.description is not None:
@@ -119,7 +171,7 @@ async def delete_device(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
-
+    check_device_access(device, current_user)
     await db.delete(device)
 
 
@@ -129,13 +181,15 @@ async def delete_device(
 @router.get("/rules/all", response_model=list[AlertRuleResponse])
 async def list_all_rules(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """List all alert rules across all devices (bulk fetch to avoid N+1)."""
-    result = await db.execute(
-        select(AlertRule, Device.name)
-        .join(Device, AlertRule.device_id == Device.id)
-        .order_by(Device.name, AlertRule.id)
-    )
+    """List all alert rules (bulk fetch)."""
+    query = select(AlertRule, Device.name).join(Device, AlertRule.device_id == Device.id)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+    query = query.order_by(Device.name, AlertRule.id)
+
+    result = await db.execute(query)
     rules = []
     for rule, device_name in result.all():
         rule_dict = {
@@ -155,15 +209,17 @@ async def list_all_rules(
 async def list_device_rules(
     device_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List alert rules for a device."""
-    # Verify device exists
     device_result = await db.execute(select(Device).where(Device.id == device_id))
-    if not device_result.scalar_one_or_none():
+    device = device_result.scalar_one_or_none()
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
+    check_device_access(device, current_user)
 
     result = await db.execute(select(AlertRule).where(AlertRule.device_id == device_id))
     return result.scalars().all()
@@ -178,17 +234,18 @@ async def create_device_rule(
     device_id: int,
     rule_data: AlertRuleCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Create an alert rule for a device."""
-    # Verify device exists
     device_result = await db.execute(select(Device).where(Device.id == device_id))
-    if not device_result.scalar_one_or_none():
+    device = device_result.scalar_one_or_none()
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
+    check_device_access(device, current_user)
 
-    # Validate min < max
     if rule_data.temp_min >= rule_data.temp_max:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -211,8 +268,15 @@ async def delete_device_rule(
     device_id: int,
     rule_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Delete an alert rule."""
+    device_result = await db.execute(select(Device).where(Device.id == device_id))
+    device = device_result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    check_device_access(device, current_user)
+
     result = await db.execute(
         select(AlertRule).where(
             AlertRule.id == rule_id,

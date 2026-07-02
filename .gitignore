@@ -47,3 +47,10 @@ firmware/.vscode/
 
 # Node
 node_modules/
+
+# Secrets & Credentials
+firebase-adminsdk.json
+google-services.json
+render.yaml
+*.zip
+commandlinetools-*/

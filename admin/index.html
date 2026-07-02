@@ -1,172 +1,350 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Egg Guardian Admin</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Egg Guardian — Admin</title>
+  <meta name="description" content="Egg Guardian incubator monitoring system — administrator dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <!-- Login Screen -->
-    <div id="login-screen" class="login-overlay">
-        <div class="login-card">
-            <div class="login-icon">🥚</div>
-            <h1>Egg Guardian</h1>
-            <h2>Admin Login</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="login-email">Email</label>
-                    <input type="email" id="login-email" placeholder="admin@egg.com" required>
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="login-password" placeholder="••••••••" required>
-                        <button type="button" id="toggle-password" class="password-toggle" title="Show password">👁️</button>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary btn-glow">Sign In</button>
-                <p id="login-error" class="error-text"></p>
+
+  <!-- ── LOGIN OVERLAY ───────────────────────────────────────────────── -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-glow"></div>
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="login-logo-icon">◈</span>
+      </div>
+      <h1 class="login-title">Egg Guardian</h1>
+      <p class="login-subtitle">Admin Dashboard</p>
+
+      <div id="login-error" class="login-error hidden"></div>
+
+      <form id="login-form" class="login-form" novalidate>
+        <div class="field-group">
+          <label class="field-label" for="login-email">Email address</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.5 6.5l7.5 5 7.5-5M2.5 5.5h15a.5.5 0 01.5.5v9a.5.5 0 01-.5.5h-15a.5.5 0 01-.5-.5V6a.5.5 0 01.5-.5z"/>
+            </svg>
+            <input id="login-email" class="field-input" type="email" placeholder="admin@example.com" autocomplete="email" required />
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="login-password">Password</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="9" width="12" height="8" rx="1.5" stroke-linecap="round"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 9V7a3 3 0 016 0v2"/>
+            </svg>
+            <input id="login-password" class="field-input" type="password" placeholder="••••••••" autocomplete="current-password" required />
+          </div>
+        </div>
+        <button id="login-btn" type="submit" class="btn btn-primary btn-full">
+          <span id="login-btn-label">Sign In</span>
+          <span id="login-spinner" class="btn-spinner hidden"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── APP SHELL ───────────────────────────────────────────────────── -->
+  <div id="app" class="app hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="sidebar-logo-icon">◈</span>
+        <div>
+          <div class="sidebar-title">Egg Guardian</div>
+          <div class="sidebar-sub">Admin Panel</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="overview" id="nav-overview">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+          </svg>
+          Overview
+        </button>
+        <button class="nav-item" data-tab="devices" id="nav-devices">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+          </svg>
+          Devices
+        </button>
+        <button class="nav-item" data-tab="alerts" id="nav-alerts">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zm0 16a2 2 0 01-1.732-1h3.464A2 2 0 0110 18z"/>
+          </svg>
+          Alerts
+          <span id="alerts-badge" class="nav-badge hidden">0</span>
+        </button>
+        <button class="nav-item" data-tab="users" id="nav-users">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zm8 0a3 3 0 11-6 0 3 3 0 016 0zM1 17a7 7 0 0114 0H1zm8 0a7 7 0 0114 0H9z"/>
+          </svg>
+          Users
+          <span id="users-badge" class="nav-badge hidden">0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn-logout">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 4.5l4 5.5-4 5.5M17 10H8M3 4.5A1.5 1.5 0 011.5 6v8A1.5 1.5 0 003 15.5h5"/>
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <!-- Mobile header -->
+      <div class="mobile-header">
+        <button class="mobile-menu-btn" id="sidebar-toggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+            <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <span class="mobile-title">Egg Guardian</span>
+        <div style="width:36px"></div>
+      </div>
+
+      <!-- Toast container -->
+      <div id="toast-container" class="toast-container"></div>
+
+      <!-- ── TAB: OVERVIEW ──────────────────────────────────────────── -->
+      <section id="tab-overview" class="tab-content active">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Overview</h2>
+            <p class="page-subtitle">Real-time monitoring summary</p>
+          </div>
+          <button id="refresh-overview" class="btn btn-ghost btn-sm">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v4h.01M16 16v-4h-.01M4.07 14.93A8 8 0 1015.93 5.07"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stat-grid" id="overview-stats">
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--amber">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                <path fill-rule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-value" id="stat-total-devices">—</div>
+              <div class="stat-label">Total Devices</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--green">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-value" id="stat-active-devices">—</div>
+              <div class="stat-label">Active Devices</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--red">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zm0 16a2 2 0 01-1.732-1h3.464A2 2 0 0110 18z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-value" id="stat-unread-alerts">—</div>
+              <div class="stat-label">Active Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-icon--blue">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zm8 0a3 3 0 11-6 0 3 3 0 016 0zM1 17a7 7 0 0114 0H1zm8 0a7 7 0 0114 0H9z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="stat-value" id="stat-total-users">—</div>
+              <div class="stat-label">Registered Users</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Device list preview -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Device Status</h3>
+          </div>
+          <div id="overview-device-list" class="device-table-wrap">
+            <p class="empty-msg">Loading...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB: DEVICES ───────────────────────────────────────────── -->
+      <section id="tab-devices" class="tab-content">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Devices</h2>
+            <p class="page-subtitle">Register and manage monitoring units</p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- Register form -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Register New Device</h3>
+            </div>
+            <form id="register-device-form" novalidate>
+              <div class="field-group">
+                <label class="field-label" for="device-id">Device ID</label>
+                <input id="device-id" class="field-input" type="text" placeholder="e.g. eggpod-01" />
+              </div>
+              <div class="field-group" style="margin-top:12px">
+                <label class="field-label" for="device-name">Display Name</label>
+                <input id="device-name" class="field-input" type="text" placeholder="e.g. Incubator A" />
+              </div>
+              <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px">Register Device</button>
             </form>
-            <p class="login-footer">Secure admin access only</p>
-        </div>
-    </div>
+          </div>
 
-    <!-- Main Admin Panel -->
-    <div id="admin-panel" class="container hidden">
-        <header>
-            <div class="header-content">
-                <div class="header-top">
-                    <div class="header-brand">
-                        <h1>🥚 Egg Guardian Admin</h1>
-                        <p class="subtitle">Device & Alert Management</p>
-                    </div>
-                    <div class="header-actions">
-                        <span id="admin-email" class="admin-badge">admin</span>
-                        <button id="logout-btn" class="btn-logout">Logout</button>
-                    </div>
-                </div>
+          <!-- Devices table -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">All Devices</h3>
+              <span id="device-count" class="tag">0</span>
             </div>
-        </header>
-
-        <main>
-            <section class="card">
-                <h2>Register Device</h2>
-                <form id="device-form">
-                    <div class="form-group">
-                        <label for="device-id">Device ID</label>
-                        <input type="text" id="device-id" placeholder="eggpod-01" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="device-name">Device Name</label>
-                        <input type="text" id="device-name" placeholder="Incubator A" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Register Device</button>
-                </form>
-            </section>
-
-            <section class="card">
-                <h2>Create Alert Rule</h2>
-                <form id="alert-form">
-                    <div class="form-group">
-                        <label for="alert-device">Device</label>
-                        <select id="alert-device" required>
-                            <option value="">Select device...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="temp-min">Min Temperature (°C)</label>
-                        <input type="number" id="temp-min" step="0.1" value="35.0">
-                    </div>
-                    <div class="form-group">
-                        <label for="temp-max">Max Temperature (°C)</label>
-                        <input type="number" id="temp-max" step="0.1" value="39.0">
-                    </div>
-                    <button type="submit" class="btn btn-warning">Create Alert Rule</button>
-                </form>
-            </section>
-
-            <section class="card">
-                <h2>Registered Devices</h2>
-                <div id="devices-list" class="list">
-                    <p class="empty-state">No devices registered yet.</p>
-                </div>
-            </section>
-
-            <section class="card">
-                <h2>Alert Rules</h2>
-                <div id="alerts-list" class="list">
-                    <p class="empty-state">No alert rules configured.</p>
-                </div>
-            </section>
-
-            <section class="card card-full alerts-section">
-                <div class="alerts-header">
-                    <div class="alerts-title-row">
-                        <h2>🚨 Triggered Alerts</h2>
-                        <span class="refresh-badge">⟳ Live</span>
-                    </div>
-                    <div class="alerts-controls">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="show-acknowledged" onchange="toggleAlertFilter()">
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-text">Show acknowledged</span>
-                        </label>
-                        <div class="btn-group">
-                            <button class="btn-action" onclick="acknowledgeAllAlerts()">✓ Acknowledge All</button>
-                            <button class="btn-action btn-danger" onclick="clearAcknowledgedAlerts()">🗑️ Clear Acknowledged</button>
-                            <button class="btn-action btn-danger-strong" onclick="deleteAllAlerts()">⚠️ Delete All</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="triggered-alerts-list" class="alerts-list">
-                    <p class="empty-state">No alerts triggered yet. 🎉</p>
-                </div>
-            </section>
-
-            <section class="card card-full">
-                <h2>👥 Registered Users</h2>
-                <div id="users-list" class="list">
-                    <p class="empty-state">No users registered yet.</p>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>Egg Guardian v0.1.0 | <a href="http://localhost:8000/docs" target="_blank" rel="noopener">API Docs</a></p>
-        </footer>
-    </div>
-
-    <!-- Modern Confirmation Modal -->
-    <div id="confirm-modal" class="modal-overlay hidden">
-        <div class="modal">
-            <div class="modal-icon">⚠️</div>
-            <h3 class="modal-title">Delete Alert Rule?</h3>
-            <p class="modal-message">This action cannot be undone.</p>
-            <div class="modal-buttons">
-                <button id="modal-cancel" class="btn-modal btn-modal-cancel">Cancel</button>
-                <button id="modal-confirm" class="btn-modal btn-modal-delete">Delete</button>
+            <div id="devices-list" class="device-table-wrap">
+              <p class="empty-msg">No devices registered.</p>
             </div>
+          </div>
         </div>
-    </div>
+      </section>
 
-    <!-- Delete All Alerts Modal -->
-    <div id="delete-all-modal" class="modal-overlay hidden">
-        <div class="modal modal-danger">
-            <div class="modal-icon">🚨</div>
-            <h3 class="modal-title">Delete ALL Alerts?</h3>
-            <p class="modal-message">
-                This will <strong>permanently delete</strong> all triggered alerts, 
-                including unacknowledged ones.<br><br>
-                <span class="modal-warning">⚠️ This action cannot be undone!</span>
-            </p>
-            <div class="modal-buttons">
-                <button id="delete-all-cancel" class="btn-modal btn-modal-cancel">Cancel</button>
-                <button id="delete-all-confirm" class="btn-modal btn-modal-delete-all">Delete All</button>
+      <!-- ── TAB: ALERTS ────────────────────────────────────────────── -->
+      <section id="tab-alerts" class="tab-content">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Alerts</h2>
+            <p class="page-subtitle">Temperature thresholds and triggered events</p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- Thresholds form -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Alert Thresholds</h3>
             </div>
-        </div>
-    </div>
+            <form id="alert-rule-form" novalidate>
+              <div class="field-group">
+                <label class="field-label" for="rule-device">Device</label>
+                <select id="rule-device" class="field-input field-select">
+                  <option value="">Select a device...</option>
+                </select>
+              </div>
+              <div class="two-col-sm" style="margin-top:12px">
+                <div class="field-group">
+                  <label class="field-label" for="rule-min">Min Temp (°C)</label>
+                  <input id="rule-min" class="field-input" type="number" value="35.0" step="0.5" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="rule-max">Max Temp (°C)</label>
+                  <input id="rule-max" class="field-input" type="number" value="39.0" step="0.5" />
+                </div>
+              </div>
+              <button type="submit" class="btn btn-warning btn-full" style="margin-top:16px">Save Thresholds</button>
+            </form>
+          </div>
 
-    <script src="app.js"></script>
+          <!-- Live monitor -->
+          <div class="card" id="live-monitor-card">
+            <div class="card-header">
+              <h3 class="card-title">Live Monitor</h3>
+              <span id="ws-status" class="status-pill status-syncing">Connecting</span>
+            </div>
+            <div class="live-temp-display">
+              <div id="live-temp-value" class="live-temp-value">—</div>
+              <div id="live-temp-unit" class="live-temp-unit">°C</div>
+            </div>
+            <canvas id="live-chart" height="80"></canvas>
+          </div>
+        </div>
+
+        <!-- Triggered alerts -->
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <h3 class="card-title">Triggered Alerts</h3>
+            <div class="header-actions">
+              <span id="pending-alerts-count" class="tag tag-danger hidden">0 Active</span>
+              <button id="ack-all-btn" class="btn btn-ghost btn-sm hidden">Acknowledge All</button>
+            </div>
+          </div>
+          <div id="alerts-list" class="list-stack">
+            <p class="empty-msg">No alerts triggered.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TAB: USERS ─────────────────────────────────────────────── -->
+      <section id="tab-users" class="tab-content">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Users</h2>
+            <p class="page-subtitle">Manage access and roles</p>
+          </div>
+        </div>
+
+        <!-- Pending approvals -->
+        <div id="pending-section" class="hidden">
+          <div class="section-divider">
+            <span class="section-divider-label">Pending Approval</span>
+            <span id="pending-count-badge" class="tag tag-amber">0</span>
+          </div>
+          <div id="pending-users-list" class="list-stack" style="margin-bottom:24px"></div>
+        </div>
+
+        <!-- Active users -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Active Users</h3>
+            <span id="user-count" class="tag">0</span>
+          </div>
+          <div id="users-list" class="list-stack">
+            <p class="empty-msg">No users yet.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Confirm modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="confirm-title" class="modal-title"></h3>
+      <p id="confirm-body" class="modal-body"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-ok" class="btn btn-danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>

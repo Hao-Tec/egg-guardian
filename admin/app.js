@@ -1,8 +1,11 @@
 /**
  * Egg Guardian Admin - Client-side JavaScript
+ * Updated for the new Design System
  */
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = window.location.origin.includes('localhost') 
+    ? 'http://localhost:8000/api/v1' 
+    : '/api/v1';
 
 // State
 let devices = [];
@@ -13,35 +16,130 @@ let authToken = localStorage.getItem('admin_token');
 let currentUser = null;
 
 // Session security
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 let sessionTimeoutId = null;
 let inactivityTimeoutId = null;
 let loginTimestamp = localStorage.getItem('admin_login_time');
 
 // Security: HTML escape to prevent XSS
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// DOM elements
-const deviceForm = document.getElementById('device-form');
-const alertForm = document.getElementById('alert-form');
-const devicesList = document.getElementById('devices-list');
-const alertsList = document.getElementById('alerts-list');
-const alertDeviceSelect = document.getElementById('alert-device');
-const usersList = document.getElementById('users-list');
-const triggeredAlertsList = document.getElementById('triggered-alerts-list');
-const loginScreen = document.getElementById('login-screen');
-const adminPanel = document.getElementById('admin-panel');
-const loginForm = document.getElementById('login-form');
-const loginError = document.getElementById('login-error');
-const adminEmail = document.getElementById('admin-email');
-const logoutBtn = document.getElementById('logout-btn');
+// ── DOM Elements ──────────────────────────────────────────────────────────
 
-// ============== Authentication ==============
+const els = {
+    // Layout
+    loginOverlay: document.getElementById('login-overlay'),
+    app: document.getElementById('app'),
+    
+    // Login
+    loginForm: document.getElementById('login-form'),
+    loginError: document.getElementById('login-error'),
+    loginEmail: document.getElementById('login-email'),
+    loginPass: document.getElementById('login-password'),
+    loginBtn: document.getElementById('login-btn'),
+    loginBtnLabel: document.getElementById('login-btn-label'),
+    loginSpinner: document.getElementById('login-spinner'),
+    
+    // Navigation
+    sidebarToggle: document.getElementById('sidebar-toggle'),
+    sidebar: document.querySelector('.sidebar'),
+    navItems: document.querySelectorAll('.nav-item'),
+    tabContents: document.querySelectorAll('.tab-content'),
+    logoutBtn: document.getElementById('logout-btn'),
+    
+    // Badges
+    alertsBadge: document.getElementById('alerts-badge'),
+    usersBadge: document.getElementById('users-badge'),
+    
+    // Overview Tab
+    statTotalDevices: document.getElementById('stat-total-devices'),
+    statActiveDevices: document.getElementById('stat-active-devices'),
+    statUnreadAlerts: document.getElementById('stat-unread-alerts'),
+    statTotalUsers: document.getElementById('stat-total-users'),
+    overviewDeviceList: document.getElementById('overview-device-list'),
+    refreshOverviewBtn: document.getElementById('refresh-overview'),
+    
+    // Devices Tab
+    registerForm: document.getElementById('register-device-form'),
+    devIdInput: document.getElementById('device-id'),
+    devNameInput: document.getElementById('device-name'),
+    devicesList: document.getElementById('devices-list'),
+    deviceCountTag: document.getElementById('device-count'),
+    
+    // Alerts Tab
+    alertForm: document.getElementById('alert-rule-form'),
+    ruleDevice: document.getElementById('rule-device'),
+    ruleMin: document.getElementById('rule-min'),
+    ruleMax: document.getElementById('rule-max'),
+    alertsList: document.getElementById('alerts-list'),
+    pendingAlertsCount: document.getElementById('pending-alerts-count'),
+    ackAllBtn: document.getElementById('ack-all-btn'),
+    
+    // Live Monitor
+    wsStatus: document.getElementById('ws-status'),
+    liveTempValue: document.getElementById('live-temp-value'),
+    
+    // Users Tab
+    pendingSection: document.getElementById('pending-section'),
+    pendingCountBadge: document.getElementById('pending-count-badge'),
+    pendingUsersList: document.getElementById('pending-users-list'),
+    usersList: document.getElementById('users-list'),
+    userCountTag: document.getElementById('user-count'),
+    
+    // Modal
+    confirmModal: document.getElementById('confirm-modal'),
+    confirmTitle: document.getElementById('confirm-title'),
+    confirmBody: document.getElementById('confirm-body'),
+    confirmCancel: document.getElementById('confirm-cancel'),
+    confirmOk: document.getElementById('confirm-ok'),
+    
+    // Toast
+    toastContainer: document.getElementById('toast-container')
+};
+
+// ── Initialization & Auth ───────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+    checkAuth();
+});
+
+function setupEventListeners() {
+    els.loginForm.addEventListener('submit', handleLogin);
+    els.logoutBtn.addEventListener('click', () => logout(false));
+    els.refreshOverviewBtn.addEventListener('click', loadAllData);
+    
+    // Navigation
+    els.navItems.forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+    
+    els.sidebarToggle.addEventListener('click', () => {
+        els.sidebar.classList.toggle('open');
+    });
+    
+    // Forms
+    els.registerForm.addEventListener('submit', registerDevice);
+    els.alertForm.addEventListener('submit', saveAlertRule);
+    
+    // Modal
+    els.confirmCancel.addEventListener('click', closeModal);
+    els.confirmModal.addEventListener('click', (e) => {
+        if (e.target === els.confirmModal) closeModal();
+    });
+    
+    // Alerts
+    els.ackAllBtn.addEventListener('click', acknowledgeAllAlerts);
+    els.ruleDevice.addEventListener('change', () => {
+        setupWebSocket(els.ruleDevice.value);
+    });
+}
 
 async function checkAuth() {
     if (!authToken) {
@@ -49,32 +147,27 @@ async function checkAuth() {
         return false;
     }
     
-    // Check if session has expired (page was left open too long)
     if (checkSessionExpiry()) {
         logout(true);
         return false;
     }
     
     try {
-        // Verify token by fetching current user info
         const response = await fetch(`${API_BASE}/auth/me`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
-        if (!response.ok) {
-            throw new Error('Invalid token');
-        }
+        if (!response.ok) throw new Error('Invalid token');
         
         currentUser = await response.json();
         
-        // Check if user is admin
         if (!currentUser.is_superuser) {
-            loginError.textContent = 'Access denied. You are not an admin.';
+            showLoginError('Access denied. Admin privileges required.');
             logout();
             return false;
         }
         
-        showAdminPanel();
+        showApp();
         return true;
     } catch (error) {
         console.error('Auth check failed:', error);
@@ -84,728 +177,559 @@ async function checkAuth() {
 }
 
 function showLogin() {
-    loginScreen.classList.remove('hidden');
-    adminPanel.classList.add('hidden');
+    els.app.classList.add('hidden');
+    els.loginOverlay.classList.remove('hidden');
 }
 
-function showAdminPanel() {
-    loginScreen.classList.add('hidden');
-    adminPanel.classList.remove('hidden');
-    adminEmail.textContent = `👤 ${currentUser?.email || 'Admin'}`;
-    
-    // Start session security
+function showApp() {
+    els.loginOverlay.classList.add('hidden');
+    els.app.classList.remove('hidden');
     startSession();
-    
-    // Load data
-    fetchDevices();
-    fetchAlertRules();
-    fetchUsers();
-    fetchTriggeredAlerts();
-    
-    // Start auto-refresh for all data
+    loadAllData();
     startDataAutoRefresh();
 }
 
-async function login(email, password) {
+async function handleLogin(e) {
+    e.preventDefault();
+    els.loginError.classList.add('hidden');
+    els.loginBtnLabel.classList.add('hidden');
+    els.loginSpinner.classList.remove('hidden');
+    els.loginBtn.disabled = true;
+    
     try {
         const response = await fetch(`${API_BASE}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ 
+                email: els.loginEmail.value, 
+                password: els.loginPass.value 
+            })
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Login failed');
+            const err = await response.json();
+            throw new Error(err.detail || 'Login failed');
         }
         
         const data = await response.json();
         authToken = data.access_token;
         localStorage.setItem('admin_token', authToken);
-        
         await checkAuth();
     } catch (error) {
-        // Handle both Error objects and plain strings
-        const message = error.message || (typeof error === 'string' ? error : 'Login failed');
-        loginError.textContent = message;
+        showLoginError(error.message);
+    } finally {
+        els.loginBtnLabel.classList.remove('hidden');
+        els.loginSpinner.classList.add('hidden');
+        els.loginBtn.disabled = false;
     }
+}
+
+function showLoginError(msg) {
+    els.loginError.textContent = msg;
+    els.loginError.classList.remove('hidden');
 }
 
 function logout(showExpiredMessage = false) {
     stopDataAutoRefresh();
     stopSessionTimers();
+    if (ws) ws.close();
     authToken = null;
     currentUser = null;
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_login_time');
     showLogin();
-    
-    if (showExpiredMessage) {
-        showToast('Session expired. Please login again.', true);
-    }
+    if (showExpiredMessage) showToast('Session expired. Please login again.', true);
 }
 
-// Session security functions
+// ── Session Timers ──────────────────────────────────────────────────────
+
 function startSession() {
     loginTimestamp = Date.now();
     localStorage.setItem('admin_login_time', loginTimestamp);
     
-    // Set absolute session timeout (30 minutes from login)
-    sessionTimeoutId = setTimeout(() => {
-        console.log('Session timeout reached');
-        logout(true);
-    }, SESSION_TIMEOUT_MS);
-    
-    // Start inactivity timer
+    sessionTimeoutId = setTimeout(() => logout(true), SESSION_TIMEOUT_MS);
     resetActivityTimer();
     
-    // Add activity listeners
-    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-        document.addEventListener(event, resetActivityTimer);
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+        document.addEventListener(evt, resetActivityTimer);
     });
 }
 
 function resetActivityTimer() {
     if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
-    
-    inactivityTimeoutId = setTimeout(() => {
-        console.log('Inactivity timeout reached');
-        logout(true);
-    }, INACTIVITY_TIMEOUT_MS);
+    inactivityTimeoutId = setTimeout(() => logout(true), INACTIVITY_TIMEOUT_MS);
 }
 
 function stopSessionTimers() {
-    if (sessionTimeoutId) {
-        clearTimeout(sessionTimeoutId);
-        sessionTimeoutId = null;
-    }
-    if (inactivityTimeoutId) {
-        clearTimeout(inactivityTimeoutId);
-        inactivityTimeoutId = null;
-    }
-    
-    // Remove activity listeners
-    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-        document.removeEventListener(event, resetActivityTimer);
+    if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
+    if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+        document.removeEventListener(evt, resetActivityTimer);
     });
 }
 
 function checkSessionExpiry() {
     if (!loginTimestamp) return false;
-    
-    const elapsed = Date.now() - parseInt(loginTimestamp);
-    return elapsed > SESSION_TIMEOUT_MS;
+    return (Date.now() - parseInt(loginTimestamp)) > SESSION_TIMEOUT_MS;
 }
 
-// Login form handler
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    loginError.textContent = '';
-    
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    
-    await login(email, password);
-});
+// ── Navigation ──────────────────────────────────────────────────────────
 
-// Logout handler
-logoutBtn.addEventListener('click', () => logout(false));
-
-// Password visibility toggle
-document.getElementById('toggle-password').addEventListener('click', function() {
-    const passwordInput = document.getElementById('login-password');
-    const isPassword = passwordInput.type === 'password';
-    passwordInput.type = isPassword ? 'text' : 'password';
-    this.textContent = isPassword ? '🙈' : '👁️';
-    this.title = isPassword ? 'Hide password' : 'Show password';
-});
-
-// Toast notification
-function showToast(message, isError = false) {
-    const toast = document.createElement('div');
-    toast.className = `toast${isError ? ' error' : ''}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
+function switchTab(tabId) {
+    els.navItems.forEach(btn => btn.classList.remove('active'));
+    els.tabContents.forEach(tab => tab.classList.remove('active'));
     
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
+    document.getElementById(`nav-${tabId}`).classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    
+    if (window.innerWidth <= 768) els.sidebar.classList.remove('open');
 }
 
-// Render devices list
-function renderDevices() {
-    if (devices.length === 0) {
-        devicesList.innerHTML = '<p class="empty-state">No devices registered yet.</p>';
-        alertDeviceSelect.innerHTML = '<option value="">Select device...</option>';
-        return;
+// ── Data Loading & Rendering ────────────────────────────────────────────
+
+let dataRefreshInterval = null;
+
+function startDataAutoRefresh() {
+    if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+    dataRefreshInterval = setInterval(loadAllData, 10000);
+}
+
+function stopDataAutoRefresh() {
+    if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+}
+
+async function loadAllData() {
+    try {
+        await Promise.all([
+            fetchDevices(),
+            fetchUsers(),
+            fetchAlerts()
+        ]);
+        updateUI();
+    } catch (e) {
+        console.error('Failed to load data', e);
     }
-    
-    devicesList.innerHTML = devices.map(device => `
-        <div class="list-item">
-            <div>
-                <div class="name">${device.name}</div>
-                <div class="meta">${device.device_id}</div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="meta">${device.is_active ? '🟢 Active' : '⚪ Inactive'}</span>
-                <button class="delete-btn" onclick="deleteDevice(${device.id}, '${device.name}')" title="Delete device">🗑️</button>
-            </div>
-        </div>
-    `).join('');
-    
-    alertDeviceSelect.innerHTML = `
-        <option value="">Select device...</option>
-        ${devices.map(d => `<option value="${d.id}">${d.name} (${d.device_id})</option>`).join('')}
-    `;
 }
 
-// Render alert rules
-function renderAlertRules() {
-    if (alertRules.length === 0) {
-        alertsList.innerHTML = '<p class="empty-state">No alert rules configured.</p>';
-        return;
-    }
-    
-    alertsList.innerHTML = alertRules.map(rule => `
-        <div class="list-item">
-            <div>
-                <div class="name">${rule.device_name || `Device #${rule.device_id}`}</div>
-                <div class="meta">${rule.temp_min}°C – ${rule.temp_max}°C</div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="meta">${rule.is_active ? '🔔 Active' : '🔕 Muted'}</span>
-                <button class="delete-btn" onclick="deleteRule(${rule.device_id}, ${rule.id})" title="Delete rule">🗑️</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Fetch devices from API
 async function fetchDevices() {
     try {
-        const response = await fetch(`${API_BASE}/devices`);
-        if (response.ok) {
-            devices = await response.json();
-            renderDevices();
-        }
-    } catch (error) {
-        console.error('Failed to fetch devices:', error);
-        // Use mock data for demo
-        devices = [
-            { id: 1, device_id: 'eggpod-01', name: 'Demo Incubator', is_active: true }
-        ];
-        renderDevices();
-    }
+        const res = await fetch(`${API_BASE}/devices`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.ok) devices = await res.json();
+    } catch (e) {}
 }
 
-// Fetch alert rules from API (bulk fetch - single request for all devices)
-async function fetchAlertRules() {
+async function fetchUsers() {
     try {
-        // Use bulk endpoint to avoid N+1 queries
-        const response = await fetch(`${API_BASE}/devices/rules/all`);
-        if (response.ok) {
-            alertRules = await response.json();
-        } else {
-            alertRules = [];
-        }
-        renderAlertRules();
-    } catch (error) {
-        console.error('Failed to fetch alert rules:', error);
-        alertRules = [];
-        renderAlertRules();
+        const res = await fetch(`${API_BASE}/users`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.ok) users = await res.json();
+    } catch (e) {}
+}
+
+async function fetchAlerts() {
+    try {
+        const res = await fetch(`${API_BASE}/alerts?limit=100`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.ok) triggeredAlerts = await res.json();
+    } catch (e) {}
+}
+
+function updateUI() {
+    const unreadAlerts = triggeredAlerts.filter(a => !a.is_acknowledged);
+    const activeDevices = devices.filter(d => d.is_active);
+    const pendingUsers = users.filter(u => !u.is_active);
+    
+    // Overview Stats
+    els.statTotalDevices.textContent = devices.length;
+    els.statActiveDevices.textContent = activeDevices.length;
+    els.statUnreadAlerts.textContent = unreadAlerts.length;
+    els.statTotalUsers.textContent = users.length;
+    
+    // Badges
+    updateBadge(els.alertsBadge, unreadAlerts.length);
+    updateBadge(els.usersBadge, pendingUsers.length);
+    
+    // Overivew Devices List
+    renderDeviceList(els.overviewDeviceList, devices.slice(0, 5), true);
+    
+    // Devices Tab
+    els.deviceCountTag.textContent = devices.length;
+    renderDeviceList(els.devicesList, devices, false);
+    
+    // Alerts Tab
+    els.pendingAlertsCount.textContent = `${unreadAlerts.length} Active`;
+    if (unreadAlerts.length > 0) {
+        els.pendingAlertsCount.classList.remove('hidden');
+        els.ackAllBtn.classList.remove('hidden');
+    } else {
+        els.pendingAlertsCount.classList.add('hidden');
+        els.ackAllBtn.classList.add('hidden');
+    }
+    renderAlertsList();
+    updateDeviceSelect();
+    
+    // Users Tab
+    els.userCountTag.textContent = users.length - pendingUsers.length;
+    renderUsersList(pendingUsers, users.filter(u => u.is_active));
+}
+
+function updateBadge(el, count) {
+    if (count > 0) {
+        el.textContent = count;
+        el.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
     }
 }
 
-// Render users list
-function renderUsers() {
-    if (users.length === 0) {
-        usersList.innerHTML = '<p class="empty-state">No users registered yet.</p>';
+// ── Rendering HTML ──────────────────────────────────────────────────────
+
+function renderDeviceList(container, list, compact) {
+    if (list.length === 0) {
+        container.innerHTML = '<p class="empty-msg">No devices found.</p>';
         return;
     }
     
-    usersList.innerHTML = users.map(user => `
-        <div class="list-item">
-            <div>
-                <div class="name">
-                    ${escapeHtml(user.email)}
-                    ${user.is_superuser ? '<span class="role-badge admin">Admin</span>' : '<span class="role-badge user">User</span>'}
-                </div>
-                <div class="meta">${escapeHtml(user.full_name || 'No name')} • Joined ${new Date(user.created_at).toLocaleDateString()}</div>
+    container.innerHTML = list.map(d => `
+        <div class="device-row">
+            <div class="device-icon" style="background: ${d.is_active ? 'rgba(16,185,129,.1)' : 'rgba(71,85,105,.1)'}; color: ${d.is_active ? 'var(--success)' : 'var(--text-muted)'}">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                    <path fill-rule="evenodd" d="M11.5 5.5a3.5 3.5 0 00-6 2.65V12a3 3 0 106 0V8.15a3.5 3.5 0 00-.5-2.65zM9 4.5a1.5 1.5 0 011.5 1.5v5.5a1.5 1.5 0 11-3 0V6a1.5 1.5 0 011.5-1.5z" clip-rule="evenodd"/>
+                </svg>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button class="btn-toggle ${user.is_superuser ? 'active' : ''}" 
-                        onclick="toggleAdminStatus(${user.id})" 
-                        title="${user.is_superuser ? 'Remove admin' : 'Make admin'}">
-                    ${user.is_superuser ? '👑 Admin' : '🔓 Make Admin'}
+            <div class="device-info">
+                <div class="device-name">${escapeHtml(d.name)}</div>
+                <div class="device-id">${escapeHtml(d.device_id)}</div>
+            </div>
+            <span class="status-pill ${d.is_active ? 'status-connected' : ''}">${d.is_active ? 'Active' : 'Offline'}</span>
+            ${!compact ? `
+            <div class="device-actions">
+                <button class="icon-btn danger" onclick="confirmDeleteDevice(${d.id}, '${escapeHtml(d.name)}')">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                 </button>
-                <button class="delete-btn" onclick="deleteUser(${user.id}, '${escapeHtml(user.email)}')" title="Delete user">🗑️</button>
-            </div>
+            </div>` : ''}
         </div>
     `).join('');
 }
 
-// Toggle admin status for a user
-async function toggleAdminStatus(userId) {
-    try {
-        const response = await fetch(`${API_BASE}/users/${userId}/toggle-admin`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        
-        if (response.ok) {
-            const user = await response.json();
-            showToast(`${user.email} is now ${user.is_superuser ? 'an admin' : 'a regular user'}`);
-            await fetchUsers();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to toggle admin status', true);
-        }
-    } catch (error) {
-        console.error('Toggle admin failed:', error);
-        showToast('Failed to toggle admin status', true);
+function updateDeviceSelect() {
+    const currentVal = els.ruleDevice.value;
+    els.ruleDevice.innerHTML = '<option value="">Select a device...</option>' + 
+        devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+    if (currentVal && devices.some(d => d.id == currentVal)) {
+        els.ruleDevice.value = currentVal;
     }
 }
 
-// Fetch users from API (requires admin auth)
-async function fetchUsers() {
-    try {
-        const response = await fetch(`${API_BASE}/users`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        if (response.ok) {
-            users = await response.json();
-            renderUsers();
-        } else if (response.status === 401 || response.status === 403) {
-            console.warn('Not authorized to fetch users');
-            users = [];
-            renderUsers();
-        }
-    } catch (error) {
-        console.error('Failed to fetch users:', error);
-        users = [];
-        renderUsers();
-    }
-}
-
-// ============== Triggered Alerts ==============
-
-// Render triggered alerts
-function renderTriggeredAlerts() {
+function renderAlertsList() {
     if (triggeredAlerts.length === 0) {
-        triggeredAlertsList.innerHTML = '<p class="empty-state">No alerts triggered yet. 🎉</p>';
+        els.alertsList.innerHTML = '<p class="empty-msg">No alerts triggered.</p>';
         return;
     }
     
-    triggeredAlertsList.innerHTML = triggeredAlerts.map(alert => {
-        const device = devices.find(d => d.id === alert.device_id);
-        const deviceName = device ? device.name : `Device #${alert.device_id}`;
-        const time = new Date(alert.triggered_at).toLocaleString();
-        const alertClass = alert.is_acknowledged ? 'acknowledged' : 'unacknowledged';
-        const icon = alert.alert_type === 'high' ? '🔥' : '❄️';
+    els.alertsList.innerHTML = triggeredAlerts.map(a => {
+        const isHigh = a.alert_type === 'high';
+        const dName = devices.find(d => d.id === a.device_id)?.name || `Device #${a.device_id}`;
+        const time = new Date(a.triggered_at).toLocaleString();
         
         return `
-            <div class="alert-item ${alertClass}">
-                <div class="alert-info">
-                    <div class="alert-header">
-                        <span class="alert-icon">${icon}</span>
-                        <span class="alert-type ${alert.alert_type}">${alert.alert_type.toUpperCase()}</span>
-                        <span class="alert-device">${deviceName}</span>
-                    </div>
-                    <div class="alert-message">${alert.message}</div>
+            <div class="alert-row ${a.is_acknowledged ? 'acknowledged' : ''}">
+                <div class="alert-icon ${isHigh ? 'alert-icon--high' : 'alert-icon--low'}">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                        <path fill-rule="evenodd" d="${isHigh ? 'M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z' : 'M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'}" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="alert-meta">
+                    <div class="alert-msg"><strong>${escapeHtml(dName)}:</strong> ${escapeHtml(a.message)}</div>
                     <div class="alert-time">${time}</div>
                 </div>
-                <div class="alert-actions">
-                    ${!alert.is_acknowledged ? 
-                        `<button class="btn btn-small" onclick="acknowledgeAlert(${alert.id})">✓ Acknowledge</button>` : 
-                        '<span class="acknowledged-badge">✓ Acknowledged</span>'}
-                </div>
+                ${!a.is_acknowledged ? `
+                <button class="btn btn-outline-success" onclick="acknowledgeAlert(${a.id})">ACK</button>
+                ` : `
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" style="color: var(--success); flex-shrink: 0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                `}
             </div>
         `;
     }).join('');
 }
 
-// Fetch triggered alerts from API
-let showAcknowledged = false;
-let alertsRefreshInterval = null;
-
-async function fetchTriggeredAlerts() {
-    try {
-        const url = showAcknowledged 
-            ? `${API_BASE}/alerts?limit=200` 
-            : `${API_BASE}/alerts?unacknowledged_only=true&limit=100`;
-        const response = await fetch(url);
-        if (response.ok) {
-            triggeredAlerts = await response.json();
-            renderTriggeredAlerts();
-        }
-    } catch (error) {
-        console.error('Failed to fetch alerts:', error);
-        triggeredAlerts = [];
-        renderTriggeredAlerts();
+function renderUsersList(pending, active) {
+    if (pending.length > 0) {
+        els.pendingCountBadge.textContent = pending.length;
+        els.pendingSection.classList.remove('hidden');
+        els.pendingUsersList.innerHTML = pending.map(u => `
+            <div class="pending-user-row">
+                <div class="user-avatar" style="background: rgba(245,158,11,.15); color: var(--accent)">
+                    ${u.email.charAt(0).toUpperCase()}
+                </div>
+                <div class="user-info">
+                    <div class="user-email">${escapeHtml(u.email)}</div>
+                    <div class="user-meta">${escapeHtml(u.full_name || 'No name')}</div>
+                </div>
+                <div class="user-actions">
+                    <button class="btn btn-primary btn-sm" onclick="approveUser(${u.id})">Approve</button>
+                    <button class="icon-btn danger" onclick="confirmDeleteUser(${u.id}, '${escapeHtml(u.email)}')">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        els.pendingSection.classList.add('hidden');
     }
-}
-
-// Start auto-refresh for all data
-let dataRefreshInterval = null;
-
-function startDataAutoRefresh() {
-    if (dataRefreshInterval) clearInterval(dataRefreshInterval);
-    dataRefreshInterval = setInterval(() => {
-        fetchDevices();          // Refresh devices
-        fetchAlertRules();       // Refresh alert rules
-        fetchTriggeredAlerts();  // Refresh triggered alerts
-        fetchUsers();            // Refresh users list
-    }, 5000); // Refresh every 5 seconds
-}
-
-// Stop auto-refresh
-function stopDataAutoRefresh() {
-    if (dataRefreshInterval) {
-        clearInterval(dataRefreshInterval);
-        dataRefreshInterval = null;
-    }
-}
-
-// Toggle alert filter
-function toggleAlertFilter() {
-    showAcknowledged = document.getElementById('show-acknowledged').checked;
-    fetchTriggeredAlerts();
-}
-
-// Acknowledge a single alert
-async function acknowledgeAlert(alertId) {
-    try {
-        const response = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
-            method: 'PATCH',
-        });
-        
-        if (response.ok) {
-            showToast('Alert acknowledged!');
-            await fetchTriggeredAlerts();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to acknowledge alert', true);
-        }
-    } catch (error) {
-        console.error('Acknowledge failed:', error);
-        showToast('Failed to acknowledge alert', true);
-    }
-}
-
-// Acknowledge all alerts
-async function acknowledgeAllAlerts() {
-    try {
-        const response = await fetch(`${API_BASE}/alerts/acknowledge-all`, {
-            method: 'PATCH',
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showToast(`${result.acknowledged} alert${result.acknowledged === 1 ? '' : 's'} acknowledged!`);
-            await fetchTriggeredAlerts();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to acknowledge alerts', true);
-        }
-    } catch (error) {
-        console.error('Acknowledge all failed:', error);
-        showToast('Failed to acknowledge alerts', true);
-    }
-}
-
-// Clear (delete) acknowledged alerts
-async function clearAcknowledgedAlerts() {
-    try {
-        const response = await fetch(`${API_BASE}/alerts/clear-acknowledged`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showToast(`${result.deleted} acknowledged alert${result.deleted === 1 ? '' : 's'} cleared!`);
-            await fetchTriggeredAlerts();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to clear alerts', true);
-        }
-    } catch (error) {
-        console.error('Clear alerts failed:', error);
-        showToast('Failed to clear alerts', true);
-    }
-}
-
-// Delete ALL alerts (show custom modal)
-function deleteAllAlerts() {
-    document.getElementById('delete-all-modal').classList.remove('hidden');
-}
-
-// Actually delete all alerts after confirmation
-async function confirmDeleteAllAlerts() {
-    document.getElementById('delete-all-modal').classList.add('hidden');
     
-    try {
-        const response = await fetch(`${API_BASE}/alerts/delete-all`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showToast(`${result.deleted} alert${result.deleted === 1 ? '' : 's'} deleted!`);
-            await fetchTriggeredAlerts();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to delete alerts', true);
-        }
-    } catch (error) {
-        console.error('Delete all alerts failed:', error);
-        showToast('Failed to delete alerts', true);
-    }
-}
-
-// Cancel delete all
-function cancelDeleteAll() {
-    document.getElementById('delete-all-modal').classList.add('hidden');
-}
-
-// Delete a user
-function deleteUser(userId, userEmail) {
-    pendingDeleteUserId = userId;
-    pendingDeleteUserEmail = userEmail;
-    pendingDeleteDeviceId = null;
-    pendingDeleteRuleId = null;
-    
-    // Update modal text for user deletion
-    document.querySelector('.modal-title').textContent = 'Delete User?';
-    document.querySelector('.modal-message').textContent = 
-        `Are you sure you want to delete "${userEmail}"? This cannot be undone.`;
-    
-    document.getElementById('confirm-modal').classList.remove('hidden');
-}
-
-let pendingDeleteUserId = null;
-let pendingDeleteUserEmail = null;
-
-// Handle device registration
-deviceForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const deviceId = document.getElementById('device-id').value;
-    const deviceName = document.getElementById('device-name').value;
-    
-    try {
-        const response = await fetch(`${API_BASE}/devices`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                device_id: deviceId,
-                name: deviceName
-            })
-        });
-        
-        if (response.ok) {
-            showToast('Device registered successfully!');
-            deviceForm.reset();
-            await fetchDevices();
-        } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to register device', true);
-        }
-    } catch (error) {
-        // Demo mode - add locally
-        devices.push({
-            id: devices.length + 1,
-            device_id: deviceId,
-            name: deviceName,
-            is_active: true
-        });
-        renderDevices();
-        showToast('Device registered (demo mode)');
-        deviceForm.reset();
-    }
-});
-
-// Handle alert rule creation
-alertForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const deviceId = document.getElementById('alert-device').value;
-    const tempMin = parseFloat(document.getElementById('temp-min').value);
-    const tempMax = parseFloat(document.getElementById('temp-max').value);
-    
-    if (!deviceId) {
-        showToast('Please select a device', true);
+    if (active.length === 0) {
+        els.usersList.innerHTML = '<p class="empty-msg">No active users.</p>';
         return;
     }
     
+    els.usersList.innerHTML = active.map(u => `
+        <div class="user-row">
+            <div class="user-avatar" style="background: ${u.is_superuser ? 'rgba(245,158,11,.15)' : 'var(--bg-elevated)'}; color: ${u.is_superuser ? 'var(--accent)' : 'var(--text-secondary)'}">
+                ${u.email.charAt(0).toUpperCase()}
+            </div>
+            <div class="user-info">
+                <div style="display:flex; align-items:center; gap:8px">
+                    <div class="user-email">${escapeHtml(u.email)}</div>
+                    ${u.is_superuser ? '<span class="tag tag-amber">Admin</span>' : ''}
+                </div>
+                <div class="user-meta">${escapeHtml(u.full_name || 'No name')} • ${escapeHtml(u.job_role || 'No role')}</div>
+            </div>
+            <div class="user-actions">
+                ${u.id !== currentUser.id ? `
+                <button class="btn btn-ghost btn-sm" onclick="toggleAdmin(${u.id})">
+                    ${u.is_superuser ? 'Revoke Admin' : 'Make Admin'}
+                </button>
+                <button class="icon-btn danger" onclick="confirmDeleteUser(${u.id}, '${escapeHtml(u.email)}')">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                </button>
+                ` : '<span class="tag">You</span>'}
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── API Actions ─────────────────────────────────────────────────────────
+
+async function registerDevice(e) {
+    e.preventDefault();
     try {
-        const response = await fetch(`${API_BASE}/devices/${deviceId}/rules`, {
+        const res = await fetch(`${API_BASE}/devices`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                temp_min: tempMin,
-                temp_max: tempMax
-            })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ device_id: els.devIdInput.value, name: els.devNameInput.value })
         });
-        
-        if (response.ok) {
-            showToast('Alert rule created successfully!');
-            alertForm.reset();
-            await fetchAlertRules();
+        if (res.ok) {
+            showToast('Device registered!');
+            els.registerForm.reset();
+            loadAllData();
         } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to create rule', true);
+            const err = await res.json();
+            showToast(err.detail || 'Failed to register', true);
         }
-    } catch (error) {
-        // Demo mode - add locally
-        alertRules.push({
-            id: alertRules.length + 1,
-            device_id: deviceId,
-            temp_min: tempMin,
-            temp_max: tempMax,
-            is_active: true
+    } catch (e) {
+        showToast('Error connecting to server', true);
+    }
+}
+
+async function saveAlertRule(e) {
+    e.preventDefault();
+    const dId = els.ruleDevice.value;
+    if (!dId) return showToast('Please select a device', true);
+    
+    try {
+        const res = await fetch(`${API_BASE}/devices/${dId}/rules`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ temp_min: parseFloat(els.ruleMin.value), temp_max: parseFloat(els.ruleMax.value) })
         });
-        renderAlertRules();
-        showToast('Alert rule created (demo mode)');
-        alertForm.reset();
-    }
-});
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-});
-
-// Delete an alert rule
-let pendingDeleteDeviceId = null;
-let pendingDeleteRuleId = null;
-
-function deleteRule(deviceId, ruleId) {
-    pendingDeleteDeviceId = deviceId;
-    pendingDeleteRuleId = ruleId;
-    
-    // Update modal text for rule deletion
-    document.querySelector('.modal-title').textContent = 'Delete Alert Rule?';
-    document.querySelector('.modal-message').textContent = 'This action cannot be undone.';
-    
-    document.getElementById('confirm-modal').classList.remove('hidden');
-}
-
-// Modal event handlers
-document.getElementById('modal-cancel').addEventListener('click', () => {
-    document.getElementById('confirm-modal').classList.add('hidden');
-    pendingDeleteDeviceId = null;
-    pendingDeleteRuleId = null;
-});
-
-// Close modal on overlay click
-document.getElementById('confirm-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'confirm-modal') {
-        document.getElementById('confirm-modal').classList.add('hidden');
-        pendingDeleteDeviceId = null;
-        pendingDeleteRuleId = null;
-        pendingDeleteDeviceName = null;
-    }
-});
-
-// Delete a device
-let pendingDeleteDeviceName = null;
-
-function deleteDevice(deviceId, deviceName) {
-    pendingDeleteDeviceId = deviceId;
-    pendingDeleteDeviceName = deviceName;
-    pendingDeleteRuleId = null; // Not deleting a rule
-    
-    // Update modal text
-    document.querySelector('.modal-title').textContent = 'Delete Device?';
-    document.querySelector('.modal-message').textContent = 
-        `Are you sure you want to delete "${deviceName}"? All telemetry data and alert rules will also be deleted.`;
-    
-    document.getElementById('confirm-modal').classList.remove('hidden');
-}
-
-// Override confirm click to handle both device and rule deletion
-document.getElementById('modal-confirm').removeEventListener('click', handleConfirm);
-async function handleConfirm() {
-    document.getElementById('confirm-modal').classList.add('hidden');
-    
-    if (pendingDeleteRuleId) {
-        // Delete rule
-        try {
-            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}/rules/${pendingDeleteRuleId}`, {
-                method: 'DELETE',
-            });
-            
-            if (response.ok || response.status === 204) {
-                showToast('Alert rule deleted successfully!');
-                await fetchAlertRules();
-            } else {
-                const error = await response.json();
-                showToast(error.detail || 'Failed to delete rule', true);
-            }
-        } catch (error) {
-            alertRules = alertRules.filter(r => r.id !== pendingDeleteRuleId);
-            renderAlertRules();
-            showToast('Alert rule deleted (demo mode)');
+        if (res.ok) {
+            showToast('Alert rule saved!');
+            loadAllData();
+        } else {
+            const err = await res.json();
+            showToast(err.detail || 'Failed to save rule', true);
         }
-    } else if (pendingDeleteUserId) {
-        // Delete user
+    } catch (e) {
+        showToast('Error saving rule', true);
+    }
+}
+
+async function acknowledgeAlert(id) {
+    try {
+        await fetch(`${API_BASE}/alerts/${id}/acknowledge`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        loadAllData();
+    } catch (e) {}
+}
+
+async function acknowledgeAllAlerts() {
+    try {
+        await fetch(`${API_BASE}/alerts/acknowledge-all`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        showToast('All alerts acknowledged');
+        loadAllData();
+    } catch (e) {}
+}
+
+async function approveUser(id) {
+    try {
+        const res = await fetch(`${API_BASE}/users/${id}/approve`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            showToast('User approved!');
+            loadAllData();
+        }
+    } catch (e) {}
+}
+
+async function toggleAdmin(id) {
+    try {
+        const res = await fetch(`${API_BASE}/users/${id}/toggle-admin`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) loadAllData();
+    } catch (e) {}
+}
+
+// ── Modals & Deletion ───────────────────────────────────────────────────
+
+let modalAction = null;
+
+function showModal(title, body, action) {
+    els.confirmTitle.textContent = title;
+    els.confirmBody.textContent = body;
+    modalAction = action;
+    els.confirmModal.classList.remove('hidden');
+}
+
+function closeModal() {
+    els.confirmModal.classList.add('hidden');
+    modalAction = null;
+}
+
+els.confirmOk.addEventListener('click', () => {
+    if (modalAction) modalAction();
+    closeModal();
+});
+
+function confirmDeleteDevice(id, name) {
+    showModal('Delete Device', `Are you sure you want to delete ${name}? All telemetry data will be lost.`, async () => {
         try {
-            const response = await fetch(`${API_BASE}/users/${pendingDeleteUserId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            
-            if (response.ok || response.status === 204) {
-                // Check if user deleted themselves
-                if (currentUser && pendingDeleteUserId === currentUser.id) {
-                    showToast('You deleted your own account. Logging out...');
-                    setTimeout(() => logout(), 1500);
-                } else {
-                    showToast('User deleted successfully!');
-                    await fetchUsers();
+            await fetch(`${API_BASE}/devices/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } });
+            showToast('Device deleted');
+            loadAllData();
+        } catch (e) {}
+    });
+}
+
+function confirmDeleteUser(id, email) {
+    showModal('Delete User', `Are you sure you want to delete ${email}?`, async () => {
+        try {
+            await fetch(`${API_BASE}/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } });
+            showToast('User deleted');
+            loadAllData();
+        } catch (e) {}
+    });
+}
+
+// ── Toasts ──────────────────────────────────────────────────────────────
+
+function showToast(msg, isError = false) {
+    const t = document.createElement('div');
+    t.className = `toast ${isError ? 'error' : 'success'}`;
+    t.innerHTML = `<div class="toast-dot"></div><div>${msg}</div>`;
+    els.toastContainer.appendChild(t);
+    setTimeout(() => {
+        t.style.animation = 'toast-in 0.25s ease reverse';
+        setTimeout(() => t.remove(), 250);
+    }, 3000);
+}
+
+// ── Live Monitor (WebSocket + Chart) ────────────────────────────────────
+
+let ws = null;
+let chart = null;
+
+// Initialize simple canvas chart
+function initChart() {
+    const canvas = document.getElementById('live-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ data: [], borderColor: '#F59E0B', borderWidth: 2, tension: 0.4, pointRadius: 0 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { display: false }, y: { display: false, min: 33, max: 42 } },
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: false
+        }
+    });
+}
+
+function setupWebSocket(dbId) {
+    if (ws) ws.close();
+    
+    // Find device_id string from db ID
+    const d = devices.find(x => x.id == dbId);
+    if (!d) {
+        els.wsStatus.className = 'status-pill status-syncing';
+        els.wsStatus.textContent = 'Select Device';
+        els.liveTempValue.textContent = '—';
+        return;
+    }
+    
+    if (!chart && window.Chart) initChart();
+    if (chart) {
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        chart.update();
+    }
+    
+    els.wsStatus.className = 'status-pill status-syncing';
+    els.wsStatus.textContent = 'Connecting...';
+    
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.origin.includes('localhost') ? 'localhost:8000' : window.location.host;
+    ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/dashboard`);
+    
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'subscribe', channel: d.device_id }));
+        els.wsStatus.className = 'status-pill status-connected';
+        els.wsStatus.textContent = 'Connected';
+    };
+    
+    ws.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'telemetry' && data.device_id === d.device_id) {
+                els.liveTempValue.textContent = data.temperature.toFixed(1);
+                
+                if (chart) {
+                    chart.data.labels.push('');
+                    chart.data.datasets[0].data.push(data.temperature);
+                    if (chart.data.datasets[0].data.length > 30) {
+                        chart.data.labels.shift();
+                        chart.data.datasets[0].data.shift();
+                    }
+                    chart.update();
                 }
-            } else {
-                const error = await response.json();
-                showToast(error.detail || 'Failed to delete user', true);
+            } else if (data.type === 'alert') {
+                loadAllData(); // Refresh alerts
             }
-        } catch (error) {
-            users = users.filter(u => u.id !== pendingDeleteUserId);
-            renderUsers();
-            showToast('User deleted (demo mode)');
-        }
-    } else if (pendingDeleteDeviceId) {
-        // Delete device
-        try {
-            const response = await fetch(`${API_BASE}/devices/${pendingDeleteDeviceId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            
-            if (response.ok || response.status === 204) {
-                showToast('Device deleted successfully!');
-                await fetchDevices();
-                await fetchAlertRules();
-            } else {
-                const error = await response.json();
-                showToast(error.detail || 'Failed to delete device', true);
-            }
-        } catch (error) {
-            devices = devices.filter(d => d.id !== pendingDeleteDeviceId);
-            renderDevices();
-            showToast('Device deleted (demo mode)');
-        }
-    }
+        } catch (err) {}
+    };
     
-    pendingDeleteDeviceId = null;
-    pendingDeleteRuleId = null;
-    pendingDeleteDeviceName = null;
-    pendingDeleteUserId = null;
-    pendingDeleteUserEmail = null;
+    ws.onclose = () => {
+        els.wsStatus.className = 'status-pill status-syncing';
+        els.wsStatus.textContent = 'Disconnected';
+    };
 }
-document.getElementById('modal-confirm').addEventListener('click', handleConfirm);
 
-// Delete All Modal listeners
-document.getElementById('delete-all-confirm').addEventListener('click', confirmDeleteAllAlerts);
-document.getElementById('delete-all-cancel').addEventListener('click', cancelDeleteAll);
+// Load chart.js dynamically for the live monitor
+const script = document.createElement('script');
+script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+document.head.appendChild(script);

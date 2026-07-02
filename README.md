@@ -1,257 +1,139 @@
-# 🥚 Egg Guardian MVP
+# Egg Guardian
 
-**Real-time egg temperature monitoring system** - A mobile + IoT solution for egg incubator monitoring with alerts.
+**Real-time IoT Egg Temperature Monitoring System**
 
-## 🌟 Features
+A comprehensive, production-ready IoT solution designed for real-time monitoring of egg incubators. This project leverages a robust architecture featuring a FastAPI backend, a cross-platform Flutter mobile application, an ESP32 hardware firmware component, and a dedicated web-based administrative dashboard. Engineered as a professional solution and Final Year Project, it demonstrates end-to-end integration of MQTT telemetry, secure RESTful APIs, and intelligent alerting mechanisms designed to prevent incubation failure.
 
-### Core Features
-- **Real-time Monitoring**: Live temperature readings from IoT sensors via WebSocket
-- **Mobile App**: Flutter web app with live charts and device management
-- **Smart Alerts**: Configurable temperature thresholds with automatic detection
-- **Admin Panel**: Full device, user, and alert management with authentication
-- **MQTT Telemetry**: Efficient IoT data ingestion
-- **REST API**: Full-featured FastAPI backend with Swagger docs
+---
 
-### Admin Panel Features
-- 🔐 **JWT Authentication** - Secure login with role-based access
-- 📊 **Device Management** - Register, view, delete devices
-- ⚠️ **Alert Rules** - Create min/max temperature thresholds
-- 🚨 **Real-time Alerts** - Auto-updating triggered alerts (every 5s)
-- 👥 **User Management** - View, delete users, toggle admin status
-- 🛡️ **Security** - Last-admin protection, self-delete logout
+## Features
 
-### Mobile App Features
-- 📱 **Login/Register** with JWT authentication + Demo mode
-- 📋 **Device List** with auto-refresh (5s)
-- 📈 **Live Charts** with historical temperature data
-- 🔔 **Alert Banners** when temperature is out of range
-- 🔐 **Password Toggle** for visibility
+### Mobile App (Flutter)
+- **Elegant UI**: Professionally designed interface with a clean, intuitive layout focusing on user experience.
+- **Live Telemetry**: Real-time temperature charts utilizing `fl_chart` with safe-zone dynamic dashed lines for visual monitoring.
+- **Dynamic Thresholds**: Retrieves exact minimum and maximum threshold rules from the backend per device to accurately compute and display statuses such as "Optimal", "Too Hot", and "Too Cold".
+- **Push Notifications**: Firebase Cloud Messaging (FCM) integration ensuring background alerts are delivered promptly.
+- **Security**: Complete JWT Authentication flow, visible password toggles, and strict role-based routing.
 
-## 🚀 Quick Start
+### Admin Dashboard (Web)
+- **Modern Interface**: Sidebar-based navigation, glassmorphism design system, and Chart.js integration for real-time visualization.
+- **Device Management**: Register devices, assign names, and configure dynamic, device-specific alert rules.
+- **Live Monitor**: Stream incoming MQTT temperature data instantly via WebSockets without page reloads.
+- **Alert Triage**: View, acknowledge, and clear temperature alerts as they happen in real-time.
+- **User Control**: Manage system users, toggle administrative privileges, and utilize built-in protections against self-lockouts.
+
+### Backend API (FastAPI)
+- **Robust Architecture**: Built with FastAPI, SQLAlchemy, and AsyncPG for high performance and asynchronous database operations.
+- **MQTT Integration**: Direct ingestion of IoT telemetry from Mosquitto MQTT brokers.
+- **Smart Alerting Engine**: Automatically triggers alerts and dispatches emails (SMTP) alongside push notifications (FCM) whenever a sensor reading violates its configured rule.
+- **Secure Infrastructure**: Password hashing via Bcrypt, secure JWT token validation, and CORS protection.
+
+### Firmware (ESP32)
+- **IoT Ready**: C++ Firmware built using the Arduino framework and PlatformIO.
+- **Hardware Integration**: Interfaces directly with DS18B20 1-Wire precision temperature sensors.
+- **Offline Buffering**: Intelligently buffers telemetry locally when Wi-Fi connectivity is lost, flushing the queue to the server upon reconnection.
+
+---
+
+## Project Structure
+
+We maintain a clean and modular separation of concerns. 
+**[View Detailed Project Structure](docs/PROJECT_STRUCTURE.md)**
+
+---
+
+## Quick Start (Local Development)
 
 ### Prerequisites
+- **Docker Desktop** (Windows/Mac) or Docker + Docker Compose (Linux)
+- **Python 3.11+**
+- **Flutter SDK**
 
-- Docker Desktop (Windows/Mac) or Docker + Docker Compose (Linux)
-- Python 3.11+
-- Flutter SDK (for mobile development)
-
-### 1. Start Backend Services
-
+### 1. Setup Environment
+Clone the repository from the original author or your fork:
 ```bash
-# Clone and navigate to project
+git clone https://github.com/Hao-Tec/egg-guardian.git
 cd egg-guardian
+cp .env.example .env
+```
+*Note: Edit `.env` to include your Gmail App Passwords if you want to test SMTP locally.*
 
-# Copy environment file
-copy .env.example .env  # Windows
-# cp .env.example .env  # Linux/Mac
-
-# Start all services (Mosquitto, PostgreSQL, API)
+### 2. Start Backend Services
+Start the PostgreSQL database, Mosquitto MQTT broker, and FastAPI server:
+```bash
 docker-compose up --build
 ```
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **Admin Dashboard**: Open `admin/index.html` in your browser. (Since we use relative paths, it will automatically connect to your local backend).
 
-The API will be available at: http://localhost:8000
+### 3. Run Mobile App
+Run the Flutter app on an emulator or physical device. 
 
-- **API Docs**: http://localhost:8000/docs (auto-redirect from root)
-- **Health Check**: http://localhost:8000/healthz
-
-### 2. Run Flutter Web App
-
+**Important Note on IP Addresses:** 
+If you are testing locally on a physical phone connected to your PC's Wi-Fi hotspot, you must pass your PC's Local IP address using the `--dart-define` flag so the phone knows exactly how to route traffic to the local backend.
 ```bash
 cd mobile/egg_guardian
 flutter pub get
-flutter run -d chrome
+# Example for local testing (replace with your actual PC IP)
+flutter run --dart-define=API_HOST=192.168.1.100
 ```
+*If you deploy the backend to the cloud (e.g., Render) and attach a domain, local IPs are no longer required. You would simply pass `--dart-define=API_HOST=api.egg-guardian.com` and the application will work globally.*
 
-Default URL: http://localhost:32026
-
-### 3. Run Device Simulator
-
+### 4. Run IoT Simulator
+If you do not have the ESP32 hardware available, you can simulate IoT devices injecting data into the MQTT broker:
 ```bash
-# Install simulator dependency
 pip install paho-mqtt
-
-# Basic: 1 device, 1 reading/second, 60 seconds
 python scripts/simulate_devices.py --count 1 --rate 1 --duration 60
-
-# Custom device name prefix
-python scripts/simulate_devices.py --count 1 --rate 1 --duration 120 --prefix TEST
 ```
 
-### 4. Open Admin Panel
+**Simulator Parameters Explained:**
+- `--count` (Integer): Determines the number of mock devices to simulate concurrently. Setting this to `3` will create three separate virtual ESP32 sensors publishing data.
+- `--rate` (Integer): Specifies the frequency of telemetry publishing in seconds. A rate of `1` means each mock device will publish a new temperature reading every 1 second.
+- `--duration` (Integer): The total length of the simulation in seconds. A duration of `60` means the script will run and generate data for exactly one minute before automatically terminating.
 
-**Option A: Via file browser**
-```bash
-start admin/index.html  # Windows
-open admin/index.html   # Mac
-xdg-open admin/index.html  # Linux
-```
+---
 
-**Option B: First-time setup**
-1. Register a user via API: `POST /api/v1/auth/register`
-2. Make them admin: `PATCH /api/v1/users/{id}/toggle-admin`
-3. Login at the admin panel
+## Production Deployment (Render)
 
-## 📁 Project Structure
+This repository includes a `render.yaml` blueprint for one-click deployment to **Render.com**.
 
-```
-egg-guardian/
-├── services/api/          # FastAPI backend
-│   └── app/
-│       ├── main.py        # App entry point
-│       ├── config.py      # Settings
-│       ├── database.py    # SQLAlchemy setup
-│       ├── models/        # Database models
-│       ├── schemas/       # Pydantic schemas
-│       ├── routers/       # API endpoints
-│       │   ├── auth.py    # Authentication
-│       │   ├── devices.py # Device CRUD
-│       │   ├── users.py   # User management
-│       │   ├── alerts.py  # Triggered alerts
-│       │   └── telemetry.py
-│       ├── services/      # Business logic
-│       │   └── mqtt.py    # MQTT ingestion + alerts
-│       └── static/        # Favicon, assets
-├── mobile/egg_guardian/   # Flutter web app
-│   └── lib/
-│       ├── main.dart
-│       ├── config.dart
-│       ├── screens/       # Login, Devices, Device Detail
-│       └── services/      # API & WebSocket
-├── firmware/              # ESP32 firmware (Arduino)
-│   └── src/main.cpp
-├── admin/                 # Admin web UI (HTML/CSS/JS)
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── scripts/               # Device simulator
-│   └── simulate_devices.py
-├── mosquitto/             # MQTT broker config
-├── docs/                  # Documentation
-└── docker-compose.yml     # Service orchestration
-```
+1. Create a [Render](https://render.com) account and connect your GitHub repository.
+2. Click **New** > **Blueprint** and select your repository.
+3. Render will automatically provision:
+   - A Managed PostgreSQL Database.
+   - A Python Web Service (FastAPI).
+   - A Static Web Site (Admin Dashboard).
+4. Fill in the required Environment Variables in the Render Dashboard (e.g., SMTP settings, JWT secrets).
 
-## 🔌 API Endpoints
+*Note: For the MQTT Broker, it is recommended to create a free cloud instance on HiveMQ or EMQX and place the connection credentials in your Render Environment Variables.*
 
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register new user |
-| POST | `/api/v1/auth/login` | Login, get JWT token |
-| POST | `/api/v1/auth/refresh` | Refresh JWT token |
-| GET | `/api/v1/auth/me` | Get current user info |
+---
 
-### Devices
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/devices` | List all devices |
-| POST | `/api/v1/devices` | Register new device |
-| GET | `/api/v1/devices/{id}` | Get device details |
-| PATCH | `/api/v1/devices/{id}` | Update device |
-| DELETE | `/api/v1/devices/{id}` | Delete device (cascade) |
-| GET | `/api/v1/devices/{id}/telemetry` | Get temperature history |
-| GET | `/api/v1/devices/{id}/rules` | List alert rules |
-| POST | `/api/v1/devices/{id}/rules` | Create alert rule |
-| DELETE | `/api/v1/devices/{id}/rules/{rule_id}` | Delete rule |
+## Email Alerts (SMTP)
 
-### Alerts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/alerts` | List triggered alerts |
-| GET | `/api/v1/alerts/{id}` | Get specific alert |
-| PATCH | `/api/v1/alerts/{id}/acknowledge` | Acknowledge alert |
-| PATCH | `/api/v1/alerts/acknowledge-all` | Acknowledge all |
-| DELETE | `/api/v1/alerts/clear-acknowledged` | Delete acknowledged |
-| GET | `/api/v1/alerts/device/{device_id}` | Device alerts |
+Egg Guardian utilizes SMTP protocols to dispatch email alerts when an egg pod temperature breaches safe parameters. To configure this utilizing a Gmail account:
+1. Navigate to your Google Account > Security > 2-Step Verification.
+2. Scroll to **App Passwords** and generate a new password designated for "Egg Guardian".
+3. Insert this 16-character password into your `.env` (or Render Dashboard) under `SMTP_PASSWORD`.
+4. Ensure `SMTP_HOST=smtp.gmail.com` and `SMTP_PORT=587`.
 
-### Users (Admin)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/users` | List all users |
-| GET | `/api/v1/users/{id}` | Get user details |
-| DELETE | `/api/v1/users/{id}` | Delete user |
-| PATCH | `/api/v1/users/{id}/toggle-admin` | Toggle admin status |
+---
 
-### WebSocket
-| Endpoint | Description |
-|----------|-------------|
-| `/api/v1/ws/{device_id}` | Real-time temperature stream |
-| `/api/v1/ws/all` | All devices stream |
+## Push Notifications (Firebase)
 
-## 🌡️ MQTT Topics
+To enable production push notifications for Android devices:
+1. Create a project at the [Firebase Console](https://console.firebase.google.com/).
+2. Add an Android App (package name: `com.example.egg_guardian`).
+3. Download `google-services.json` and place it in the `mobile/egg_guardian/android/app/` directory.
+4. Navigate to Project Settings > Service Accounts > Generate New Private Key.
+5. Download the JSON file, rename it to exactly `firebase-adminsdk.json`, and place it in the project root.
+6. Set `FCM_MOCK_MODE=false` in your `.env`.
 
-| Topic | Direction | Payload |
-|-------|-----------|---------|
-| `egg/{device_id}/telemetry` | Device → Server | `{"device_id": "x", "ts": "ISO8601", "temp_c": 37.5}` |
+---
 
-## ⚙️ Environment Variables
-
-Copy `.env.example` to `.env` and configure:
-
-```env
-# Database
-POSTGRES_USER=egg_guardian
-POSTGRES_PASSWORD=egg_guardian_secret
-POSTGRES_DB=egg_guardian
-
-# MQTT (internal port, external is 11883)
-MQTT_BROKER=mosquitto
-MQTT_PORT=1883
-
-# JWT (change in production!)
-JWT_SECRET_KEY=change-me-in-production
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-```
-
-## 🧪 Testing
-
-```bash
-# Run API tests
-cd services/api
-pytest
-
-# Run simulator test
-python scripts/simulate_devices.py --count 3 --rate 2 --duration 30 --prefix TEST
-```
-
-## 🔔 Alert System
-
-### Creating Alert Rules
-1. Via Admin Panel: Select device, set min/max temp, click "Create Alert Rule"
-2. Via API:
-   ```
-   POST /api/v1/devices/{id}/rules
-   {"temp_min": 35.0, "temp_max": 39.0}
-   ```
-
-### When temperature exceeds thresholds:
-- 🔥 **HIGH** alert if `temp > max`
-- ❄️ **LOW** alert if `temp < min`
-- Alert recorded in database
-- Broadcast via WebSocket
-- Displayed in admin panel (auto-refresh every 5s)
-- Shown as banner in mobile app
-
-### Managing Alerts
-- **Acknowledge**: Mark alerts as seen
-- **Acknowledge All**: Mark all as seen
-- **Clear Acknowledged**: Delete acknowledged alerts only
-- **Delete All**: Permanently delete ALL alerts (with confirmation)
-
-## 🔒 Security Features
-
-- **JWT Authentication** for API and admin panel
-- **Role-based access** (superuser check for admin)
-- **Last-admin protection**: Cannot delete/demote the only admin
-- **Self-delete logout**: Admins are logged out if they delete themselves
-- **Password visibility toggle** in login forms
-
-## 📄 License
-
+## License
 MIT License - See LICENSE file
 
-## 👨‍💻 Author
-
-**AbdulWaheed Habeeb**
-
-Egg Guardian MVP - Final Year Project
+---
+**Egg Guardian MVP - Final Year Project**
+*Developed by [AbdulWaheed Habeeb](https://github.com/Hao-Tec)*

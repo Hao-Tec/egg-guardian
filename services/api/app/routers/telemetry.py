@@ -9,8 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Device, Telemetry
+from app.models import Device, Telemetry, User
 from app.schemas import TelemetryHistory, TelemetryResponse
+from app.services.deps import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["Telemetry"])
 
@@ -63,8 +64,9 @@ async def get_device_telemetry(
     hours: int = Query(default=24, ge=1, le=168),
     limit: int = Query(default=1000, ge=1, le=10000),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Get telemetry history for a device."""
+    """Get telemetry history for a device (authenticated)."""
     # Get device
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
@@ -72,6 +74,13 @@ async def get_device_telemetry(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
+        )
+
+    # Check access
+    if not current_user.is_superuser and device.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this device's telemetry",
         )
 
     # Get telemetry within time window

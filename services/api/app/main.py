@@ -50,15 +50,10 @@ app = FastAPI(
 # CORS middleware for Flutter web app
 # In development mode, allow all origins for easier testing
 # For production, set DEBUG=false and configure specific origins
-if settings.debug:
+if settings.debug or settings.cors_origins == "*":
     CORS_ORIGINS = ["*"]
 else:
-    CORS_ORIGINS = [
-        "http://localhost:32026",  # Flutter web dev
-        "http://localhost:8000",  # API docs
-        "http://127.0.0.1:32026",
-        "http://127.0.0.1:8000",
-    ]
+    CORS_ORIGINS = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,5 +1,4 @@
-/// Data models for the Egg Guardian app.
-library;
+// Data models for the Egg Guardian app.
 
 class Device {
   final int id;
@@ -7,6 +6,10 @@ class Device {
   final String name;
   final String? description;
   final bool isActive;
+  final double? lastTemp;
+  final DateTime? lastRecordedAt;
+  final double tempMin;
+  final double tempMax;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -16,6 +19,10 @@ class Device {
     required this.name,
     this.description,
     required this.isActive,
+    this.lastTemp,
+    this.lastRecordedAt,
+    this.tempMin = 35.0,
+    this.tempMax = 39.0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -27,10 +34,22 @@ class Device {
       name: json['name'],
       description: json['description'],
       isActive: json['is_active'] ?? true,
+      lastTemp: json['last_temp'] != null ? (json['last_temp'] as num).toDouble() : null,
+      tempMin: json['temp_min'] != null ? (json['temp_min'] as num).toDouble() : 35.0,
+      tempMax: json['temp_max'] != null ? (json['temp_max'] as num).toDouble() : 39.0,
+      lastRecordedAt: json['last_recorded_at'] != null ? DateTime.parse(json['last_recorded_at']) : null,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Device && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class Telemetry {
@@ -128,13 +147,19 @@ class User {
   final int id;
   final String email;
   final String? fullName;
+  final String? jobRole;
   final bool isActive;
+  final bool isSuperuser;
+  final DateTime? createdAt;
 
   User({
     required this.id,
     required this.email,
     this.fullName,
+    this.jobRole,
     required this.isActive,
+    required this.isSuperuser,
+    this.createdAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -142,7 +167,10 @@ class User {
       id: json['id'],
       email: json['email'],
       fullName: json['full_name'],
+      jobRole: json['job_role'],
       isActive: json['is_active'] ?? true,
+      isSuperuser: json['is_superuser'] ?? false,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
     );
   }
 }
@@ -163,7 +191,7 @@ class WsMessage {
     );
   }
 
-  double? get tempC => data['temp_c'] as double?;
+  double? get tempC => data['temp_c'] != null ? (data['temp_c'] as num).toDouble() : null;
   String? get alertType => data['alert_type'] as String?;
   String? get message => data['message'] as String?;
 }

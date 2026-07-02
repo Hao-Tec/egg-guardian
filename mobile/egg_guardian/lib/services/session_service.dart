@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// Session service for managing user activity and auto-logout.
-class SessionService {
+class SessionService with WidgetsBindingObserver {
   static final SessionService _instance = SessionService._internal();
   factory SessionService() => _instance;
   SessionService._internal();
@@ -13,16 +13,18 @@ class SessionService {
   Timer? _inactivityTimer;
   VoidCallback? _onSessionExpired;
   bool _isActive = false;
+  DateTime _lastActivity = DateTime.now();
 
   /// Initialize session tracking with callback for session expiry.
   void init({required VoidCallback onSessionExpired}) {
     _onSessionExpired = onSessionExpired;
+    WidgetsBinding.instance.addObserver(this);
   }
 
   /// Start session tracking.
   void startSession() {
     _isActive = true;
-    _resetInactivityTimer();
+    recordActivity();
   }
 
   /// Stop session tracking.
@@ -34,6 +36,7 @@ class SessionService {
 
   /// Record user activity (resets inactivity timer).
   void recordActivity() {
+    _lastActivity = DateTime.now();
     if (_isActive) {
       _resetInactivityTimer();
     }
@@ -42,15 +45,35 @@ class SessionService {
   void _resetInactivityTimer() {
     _inactivityTimer?.cancel();
     _inactivityTimer = Timer(inactivityTimeout, () {
-      if (_isActive) {
-        _isActive = false;
-        _onSessionExpired?.call();
-      }
+      triggerSessionExpiry();
     });
+  }
+
+  /// Manually trigger session expiry (e.g., on token refresh failure).
+  void triggerSessionExpiry() {
+    if (_isActive) {
+      _isActive = false;
+      _onSessionExpired?.call();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isActive) {
+      // Check if timeout occurred while in background
+      final now = DateTime.now();
+      if (now.difference(_lastActivity) >= inactivityTimeout) {
+        triggerSessionExpiry();
+      } else {
+        // Resume timer with remaining time
+        _resetInactivityTimer();
+      }
+    }
   }
 
   /// Dispose resources.
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     stopSession();
     _onSessionExpired = null;
   }

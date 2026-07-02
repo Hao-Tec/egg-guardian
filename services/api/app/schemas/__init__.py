@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ============== Auth Schemas ==============
@@ -37,8 +37,18 @@ class UserCreate(BaseModel):
     """User registration schema."""
 
     email: EmailStr
-    password: str = Field(..., min_length=6)
-    full_name: Optional[str] = None
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=2, max_length=100, description="Worker's full name")
+    job_role: str = Field(..., min_length=2, max_length=100, description="Worker's job role (e.g. Farm Supervisor)")
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least one digit")
+        if not any(char.isalpha() for char in v):
+            raise ValueError("Password must contain at least one letter")
+        return v
 
 
 class UserLogin(BaseModel):
@@ -54,6 +64,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: Optional[str]
+    job_role: Optional[str] = None
     is_active: bool
     is_superuser: bool
     created_at: datetime
@@ -89,6 +100,10 @@ class DeviceResponse(BaseModel):
     name: str
     description: Optional[str]
     is_active: bool
+    last_temp: Optional[float] = None
+    temp_min: float = 35.0
+    temp_max: float = 39.0
+    last_recorded_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

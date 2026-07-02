@@ -29,9 +29,18 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
     debug: bool = Field(default=False, alias="DEBUG")
+    cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
 
     # FCM
     fcm_mock_mode: bool = Field(default=True, alias="FCM_MOCK_MODE")
+
+    # SMTP / Email
+    smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
+    smtp_port: int = Field(default=1025, alias="SMTP_PORT")
+    smtp_user: str = Field(default="", alias="SMTP_USER")
+    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="noreply@egg-guardian.com", alias="SMTP_FROM_EMAIL")
+    smtp_use_tls: bool = Field(default=False, alias="SMTP_USE_TLS")
 
     class Config:
         env_file = ".env"

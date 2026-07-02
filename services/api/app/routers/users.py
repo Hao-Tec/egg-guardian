@@ -1,5 +1,6 @@
 """User management router for admin."""
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from app.database import get_db
 from app.models import User
 from app.schemas import UserResponse
 from app.services.deps import get_current_superuser
+from app.services.email import send_account_approved_email
 
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
@@ -41,19 +43,61 @@ async def get_user(
     return user
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+@router.patch("/{user_id}/approve", response_model=UserResponse)
+async def approve_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_superuser),
 ):
-    """Delete a user (admin only). Cannot delete the last admin."""
+    """Approve a pending user account, granting them access (admin only)."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        )
+    if user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already active.",
+        )
+
+    user.is_active = True
+    await db.flush()
+    await db.refresh(user)
+
+    # Notify the user their account was approved
+    asyncio.create_task(
+        send_account_approved_email(
+            user_email=user.email,
+            user_name=user.full_name or user.email,
+        )
+    )
+
+    return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
+):
+    """Delete a user (admin only). Cannot delete the last admin or self."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Prevent self-deletion
+    if user.id == admin_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account.",
         )
 
     # Protect last admin
@@ -74,13 +118,20 @@ async def toggle_admin_status(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(get_current_superuser),
 ):
-    """Toggle admin (superuser) status for a user (admin only). Cannot demote the last admin."""
+    """Toggle admin (superuser) status for a user (admin only). Cannot demote the last admin or self."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        )
+
+    # Prevent self-demotion
+    if user.id == admin_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot change your own admin status.",
         )
 
     # Protect last admin from being demoted

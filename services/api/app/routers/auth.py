@@ -1,5 +1,6 @@
 """Authentication router with login, register, and token refresh."""
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +18,13 @@ from app.services.auth import (
     create_access_token,
     create_refresh_token,
     create_user,
+    get_all_admins,
     get_user_by_email,
     get_user_by_id,
     verify_token,
 )
 from app.services.deps import get_current_user
+from app.services.email import send_new_registration_email
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -31,7 +34,8 @@ async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Register a new user account."""
+    """Register a new user account. The very first user is auto-approved as Superadmin.
+    All subsequent users are set to Pending (is_active=False) until approved by an admin."""
     existing = await get_user_by_email(db, user_data.email)
     if existing:
         raise HTTPException(
@@ -39,12 +43,34 @@ async def register(
             detail="Email already registered",
         )
 
+    from sqlalchemy import select
+    result = await db.execute(select(User).limit(1))
+    is_first_user = result.scalar_one_or_none() is None
+
     user = await create_user(
         db,
         email=user_data.email,
         password=user_data.password,
         full_name=user_data.full_name,
+        job_role=user_data.job_role,
+        is_superuser=is_first_user,
+        is_active=is_first_user,  # First user active immediately; others need approval
     )
+
+    # If not the first user, notify all admins by email
+    if not is_first_user:
+        admins = await get_all_admins(db)
+        admin_emails = [a.email for a in admins]
+        # Fire-and-forget: run email sending in background
+        asyncio.create_task(
+            send_new_registration_email(
+                admin_emails=admin_emails,
+                new_user_email=user.email,
+                new_user_name=user.full_name or user.email,
+                new_user_role=user.job_role or "Not specified",
+            )
+        )
+
     return user
 
 
@@ -59,6 +85,13 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        )
+
+    # Block pending users from logging in
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is pending admin approval. Please wait for an administrator to approve your registration.",
         )
 
     return Token(

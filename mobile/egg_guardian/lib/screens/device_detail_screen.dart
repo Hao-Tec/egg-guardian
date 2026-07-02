@@ -1,24 +1,28 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:egg_guardian/config.dart';
 import 'package:egg_guardian/models.dart';
 import 'package:egg_guardian/services/api_service.dart';
 import 'package:egg_guardian/services/websocket_service.dart';
+import 'package:egg_guardian/theme.dart';
+import 'package:intl/intl.dart';
 
-/// Device detail screen with live temperature chart.
 class DeviceDetailScreen extends StatefulWidget {
   final Device device;
-
   const DeviceDetailScreen({super.key, required this.device});
 
   @override
   State<DeviceDetailScreen> createState() => _DeviceDetailScreenState();
 }
 
-class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
+class _DeviceDetailScreenState extends State<DeviceDetailScreen>
+    with WidgetsBindingObserver {
   final WebSocketService _wsService = WebSocketService();
   final List<FlSpot> _chartData = [];
+  final List<DateTime> _chartTimes = [];
   StreamSubscription? _wsSub;
   Timer? _pollTimer;
 
@@ -32,265 +36,300 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHistory();
     _connectWebSocket();
-    // Polling fallback - refresh every 2 seconds
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      _pollLatestData();
-    });
+    _startPolling();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _wsSub?.cancel();
     _wsService.disconnect();
     _pollTimer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    } else if (state == AppLifecycleState.resumed) {
+      _loadHistory();
+      _startPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(AppConfig.telemetryPollInterval, (_) {
+      if (!_wsService.isConnected) _pollLatestData();
+    });
+  }
+
   Future<void> _loadHistory() async {
     try {
-      final history = await ApiService().getTelemetry(
-        widget.device.id,
-        hours: 24,
-      );
-
+      final history = await ApiService().getTelemetry(widget.device.id, hours: 24);
+      if (!mounted) return;
       setState(() {
         _chartData.clear();
+        _chartTimes.clear();
+        _minTemp = double.infinity;
+        _maxTemp = double.negativeInfinity;
         for (var i = 0; i < history.readings.length; i++) {
-          final reading = history.readings[history.readings.length - 1 - i];
-          _chartData.add(FlSpot(i.toDouble(), reading.tempC));
-          _updateStats(reading.tempC);
+          final r = history.readings[history.readings.length - 1 - i];
+          _chartData.add(FlSpot(i.toDouble(), r.tempC));
+          _chartTimes.add(r.recordedAt);
+          _updateStats(r.tempC);
         }
-        if (_chartData.isNotEmpty) {
-          _currentTemp = _chartData.last.y;
-        }
+        if (_chartData.isNotEmpty) _currentTemp = _chartData.last.y;
         _lastReadingCount = _chartData.length;
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _pollLatestData() async {
-    if (_isLoading) return;
-
+    if (_isLoading || !mounted) return;
     try {
-      final history = await ApiService().getTelemetry(
-        widget.device.id,
-        hours: 24,
-      );
-
-      if (!mounted) return;
-
-      // Only update if we have new readings
-      if (history.readings.isNotEmpty) {
-        final latestReading = history.readings.first;
-
-        // Check if this is a new reading by comparing count or temp
-        if (history.count > _lastReadingCount ||
-            (history.count == _lastReadingCount &&
-                latestReading.tempC != _currentTemp)) {
-          setState(() {
-            _currentTemp = latestReading.tempC;
-            _updateStats(latestReading.tempC);
-            _chartData.add(
-              FlSpot(_chartData.length.toDouble(), latestReading.tempC),
-            );
-
-            // Keep last 100 points
-            if (_chartData.length > 100) {
-              _chartData.removeAt(0);
-              for (var i = 0; i < _chartData.length; i++) {
-                _chartData[i] = FlSpot(i.toDouble(), _chartData[i].y);
-              }
+      final history = await ApiService().getTelemetry(widget.device.id, hours: 24);
+      if (!mounted || history.readings.isEmpty) return;
+      final latest = history.readings.first;
+      if (history.count > _lastReadingCount || latest.tempC != _currentTemp) {
+        setState(() {
+          _currentTemp = latest.tempC;
+          _updateStats(latest.tempC);
+          _chartData.add(FlSpot(_chartData.length.toDouble(), latest.tempC));
+          _chartTimes.add(latest.recordedAt);
+          if (_chartData.length > 100) {
+            _chartData.removeAt(0);
+            _chartTimes.removeAt(0);
+            for (var i = 0; i < _chartData.length; i++) {
+              _chartData[i] = FlSpot(i.toDouble(), _chartData[i].y);
             }
-            _lastReadingCount = history.count;
-          });
-        }
+          }
+          _lastReadingCount = history.count;
+        });
       }
-    } catch (e) {
-      // Silently fail on poll errors
-    }
+    } catch (_) {}
   }
 
-  void _connectWebSocket() {
-    _wsService.connect(widget.device.deviceId);
-    _wsSub = _wsService.messageStream?.listen((message) {
-      if (message.type == 'telemetry' && mounted) {
-        final temp = message.tempC;
-        if (temp != null) {
-          setState(() {
-            _currentTemp = temp;
-            _updateStats(temp);
-            _chartData.add(FlSpot(_chartData.length.toDouble(), temp));
-            // Keep last 100 points
-            if (_chartData.length > 100) {
-              _chartData.removeAt(0);
-              // Reindex
-              for (var i = 0; i < _chartData.length; i++) {
-                _chartData[i] = FlSpot(i.toDouble(), _chartData[i].y);
-              }
-            }
-          });
-        }
-      } else if (message.type == 'alert' && mounted) {
+  Future<void> _connectWebSocket() async {
+    await _wsService.connect(widget.device.deviceId);
+    if (!mounted) return;
+    _wsSub?.cancel();
+    _wsSub = _wsService.messageStream.listen((msg) {
+      if (!mounted) return;
+      if (msg.type == 'telemetry' && msg.tempC != null) {
         setState(() {
-          _lastAlert = message.message;
+          _currentTemp = msg.tempC!;
+          _updateStats(msg.tempC!);
+          _chartData.add(FlSpot(_chartData.length.toDouble(), msg.tempC!));
+          _chartTimes.add(DateTime.now());
+          if (_chartData.length > 100) {
+            _chartData.removeAt(0);
+            _chartTimes.removeAt(0);
+            for (var i = 0; i < _chartData.length; i++) {
+              _chartData[i] = FlSpot(i.toDouble(), _chartData[i].y);
+            }
+          }
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.warning, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(child: Text(message.message ?? 'Alert triggered')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+      } else if (msg.type == 'alert') {
+        setState(() => _lastAlert = msg.message);
       }
     });
   }
 
-  void _updateStats(double temp) {
-    if (temp < _minTemp) _minTemp = temp;
-    if (temp > _maxTemp) _maxTemp = temp;
-  }
-
-  Color _getTempColor(double? temp) {
-    if (temp == null) return Colors.grey;
-    if (temp < AppConfig.tempMin) return Colors.blue;
-    if (temp > AppConfig.tempMax) return Colors.red;
-    return Colors.green;
+  void _updateStats(double t) {
+    if (t < _minTemp) _minTemp = t;
+    if (t > _maxTemp) _maxTemp = t;
   }
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.device.name,
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadHistory,
+      backgroundColor: EgTheme.bgBase,
+      body: Column(
+        children: [
+          _buildHeader(),
+          if (ApiService().isOfflineMode) _buildOfflineBanner(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: EgTheme.accent))
+                : _buildContent(),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.amber))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCurrentTempCard(),
-                  const SizedBox(height: 16),
-                  _buildStatsRow(),
-                  const SizedBox(height: 24),
-                  _buildChart(),
-                  if (_lastAlert != null) ...[
-                    const SizedBox(height: 16),
-                    _buildAlertCard(),
-                  ],
-                ],
-              ),
-            ),
     );
   }
 
-  Widget _buildCurrentTempCard() {
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        color: EgTheme.bgCard,
+        border: Border(bottom: BorderSide(color: EgTheme.border)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: EgTheme.textSecondary),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.device.name, style: GoogleFonts.outfit(
+                      fontSize: 17, fontWeight: FontWeight.w600, color: EgTheme.textPrimary,
+                    )),
+                    Text(widget.device.deviceId, style: EgTheme.body(12, color: EgTheme.textMuted)),
+                  ],
+                ),
+              ),
+              // WS status pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (_wsService.isConnected ? EgTheme.success : EgTheme.warning).withOpacity(0.1),
+                  borderRadius: EgTheme.r32,
+                  border: Border.all(
+                    color: (_wsService.isConnected ? EgTheme.success : EgTheme.warning).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6, height: 6,
+                      decoration: BoxDecoration(
+                        color: _wsService.isConnected ? EgTheme.success : EgTheme.warning,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _wsService.isConnected ? 'Live' : 'Syncing',
+                      style: EgTheme.body(11,
+                          color: _wsService.isConnected ? EgTheme.success : EgTheme.warning,
+                          weight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: EgTheme.textSecondary),
+                onPressed: _loadHistory,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 20),
+      color: EgTheme.warning.withOpacity(0.12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: EgTheme.warning, size: 13),
+          const SizedBox(width: 7),
+          Text('Offline — cached data', style: EgTheme.body(12, color: EgTheme.warning, weight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTempHero(),
+          const SizedBox(height: 16),
+          _buildStatsRow(),
+          const SizedBox(height: 20),
+          _buildChartCard(),
+          if (_lastAlert != null) ...[
+            const SizedBox(height: 16),
+            _buildAlertCard(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTempHero() {
+    final tc = tempColor(_currentTemp, minTemp: widget.device.tempMin, maxTemp: widget.device.tempMax);
+    final status = tempStatus(_currentTemp, minTemp: widget.device.tempMin, maxTemp: widget.device.tempMax);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            _getTempColor(_currentTemp).withOpacity(0.3),
-            _getTempColor(_currentTemp).withOpacity(0.1),
-          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tc.withOpacity(0.15), EgTheme.bgCard],
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _getTempColor(_currentTemp).withOpacity(0.5)),
+        borderRadius: EgTheme.r16,
+        border: Border.all(color: tc.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(color: tc.withOpacity(0.12), blurRadius: 24, offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         children: [
-          Text(
-            'Current Temperature',
-            style: TextStyle(color: Colors.grey[400], fontSize: 14),
-          ),
-          const SizedBox(height: 8),
+          Text('Current Temperature', style: EgTheme.body(13, color: EgTheme.textSecondary)),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _currentTemp?.toStringAsFixed(1) ?? '--',
-                style: TextStyle(
-                  color: _getTempColor(_currentTemp),
-                  fontSize: 64,
-                  fontWeight: FontWeight.bold,
+                _currentTemp?.toStringAsFixed(1) ?? '--.-',
+                style: GoogleFonts.outfit(
+                  fontSize: 72, fontWeight: FontWeight.w700, color: tc,
+                  height: 1,
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  '°C',
-                  style: TextStyle(
-                    color: _getTempColor(_currentTemp),
-                    fontSize: 24,
-                  ),
-                ),
+                padding: const EdgeInsets.only(top: 14),
+                child: Text('°C', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w500, color: tc)),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: _getTempColor(_currentTemp).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
+              color: tc.withOpacity(0.12),
+              borderRadius: EgTheme.r32,
+              border: Border.all(color: tc.withOpacity(0.25)),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _wsService.isConnected
-                        ? Colors.green
-                        : Colors.orange,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _wsService.isConnected ? 'Live' : 'Connecting...',
-                  style: TextStyle(
-                    color: _wsService.isConnected
-                        ? Colors.green
-                        : Colors.orange,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+            child: Text(status, style: EgTheme.body(13, color: tc, weight: FontWeight.w600)),
           ),
+          const SizedBox(height: 8),
+          Text('Safe range: ${widget.device.tempMin}°C – ${widget.device.tempMax}°C',
+              style: EgTheme.body(12, color: EgTheme.textMuted)),
         ],
       ),
     );
@@ -299,64 +338,64 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Min', _minTemp, Colors.blue)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Max', _maxTemp, Colors.red)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard('Optimal', AppConfig.tempOptimal, Colors.green),
-        ),
+        Expanded(child: _statCard('Session Min', _minTemp, EgTheme.info, Icons.arrow_downward_rounded)),
+        const SizedBox(width: 10),
+        Expanded(child: _statCard('Session Max', _maxTemp, EgTheme.danger, Icons.arrow_upward_rounded)),
+        const SizedBox(width: 10),
+        Expanded(child: _statCard('Optimal', (widget.device.tempMin + widget.device.tempMax) / 2, EgTheme.success, Icons.check_circle_outline)),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, double value, Color color) {
-    final displayValue = value.isFinite ? value.toStringAsFixed(1) : '--';
+  Widget _statCard(String label, double value, Color color, IconData icon) {
+    final display = value.isFinite ? '${value.toStringAsFixed(1)}°C' : '--';
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
+        color: EgTheme.bgCard,
+        borderRadius: EgTheme.r12,
+        border: Border.all(color: EgTheme.border),
       ),
       child: Column(
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(
-            '$displayValue°C',
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 6),
+          Text(display, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 2),
+          Text(label, style: EgTheme.body(11, color: EgTheme.textMuted)),
         ],
       ),
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChartCard() {
     return Container(
-      height: 250,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: EgTheme.card(),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Temperature History',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Temperature History', style: GoogleFonts.outfit(
+                fontSize: 15, fontWeight: FontWeight.w600, color: EgTheme.textPrimary,
+              )),
+              Text('Last 24 hours', style: EgTheme.body(12, color: EgTheme.textMuted)),
+            ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 200,
             child: _chartData.isEmpty
                 ? Center(
-                    child: Text(
-                      'No data yet',
-                      style: TextStyle(color: Colors.grey[600]),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.show_chart_rounded, color: EgTheme.textMuted, size: 36),
+                        const SizedBox(height: 8),
+                        Text('Waiting for data', style: EgTheme.body(13, color: EgTheme.textMuted)),
+                      ],
                     ),
                   )
                 : LineChart(
@@ -365,8 +404,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                         show: true,
                         drawVerticalLine: false,
                         horizontalInterval: 1,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: Colors.grey.withOpacity(0.2),
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: EgTheme.border.withOpacity(0.6),
                           strokeWidth: 1,
                         ),
                       ),
@@ -374,74 +413,73 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 40,
-                            getTitlesWidget: (value, meta) => Text(
-                              '${value.toInt()}°',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 10,
-                              ),
+                            reservedSize: 36,
+                            getTitlesWidget: (val, _) => Text(
+                              '${val.toInt()}°',
+                              style: EgTheme.body(10, color: EgTheme.textMuted),
                             ),
                           ),
                         ),
-                        bottomTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       ),
                       borderData: FlBorderData(show: false),
                       minY: 33,
                       maxY: 42,
-                      lineBarsData: [
-                        // Optimal range band
-                        LineChartBarData(
-                          spots: [
-                            FlSpot(0, AppConfig.tempMin),
-                            FlSpot(
-                              _chartData.length.toDouble(),
-                              AppConfig.tempMin,
-                            ),
-                          ],
-                          isCurved: false,
-                          color: Colors.green.withOpacity(0.3),
-                          barWidth: 0,
-                          belowBarData: BarAreaData(show: false),
-                          dotData: const FlDotData(show: false),
+                      // Safe zone reference lines
+                      extraLinesData: ExtraLinesData(horizontalLines: [
+                        HorizontalLine(
+                          y: widget.device.tempMin,
+                          color: EgTheme.success.withOpacity(0.4),
+                          strokeWidth: 1,
+                          dashArray: [4, 4],
+                          label: HorizontalLineLabel(
+                            show: true,
+                            labelResolver: (_) => '${widget.device.tempMin}°',
+                            style: EgTheme.body(9, color: EgTheme.success),
+                            alignment: Alignment.topRight,
+                          ),
                         ),
-                        // Main temperature line
+                        HorizontalLine(
+                          y: widget.device.tempMax,
+                          color: EgTheme.success.withOpacity(0.4),
+                          strokeWidth: 1,
+                          dashArray: [4, 4],
+                          label: HorizontalLineLabel(
+                            show: true,
+                            labelResolver: (_) => '${widget.device.tempMax}°',
+                            style: EgTheme.body(9, color: EgTheme.success),
+                            alignment: Alignment.topRight,
+                          ),
+                        ),
+                      ]),
+                      lineBarsData: [
                         LineChartBarData(
                           spots: _chartData,
                           isCurved: true,
-                          curveSmoothness: 0.3,
-                          color: Colors.amber,
-                          barWidth: 3,
+                          curveSmoothness: 0.25,
+                          color: EgTheme.accent,
+                          barWidth: 2.5,
+                          dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.amber.withOpacity(0.3),
-                                Colors.amber.withOpacity(0.0),
-                              ],
+                              colors: [EgTheme.accent.withOpacity(0.2), Colors.transparent],
                             ),
                           ),
-                          dotData: const FlDotData(show: false),
                         ),
                       ],
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
-                          getTooltipItems: (spots) => spots.map((spot) {
-                            return LineTooltipItem(
-                              '${spot.y.toStringAsFixed(1)}°C',
-                              const TextStyle(color: Colors.white),
-                            );
-                          }).toList(),
+                          getTooltipColor: (_) => EgTheme.bgElevated,
+                          tooltipRoundedRadius: 8,
+                          getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
+                            '${s.y.toStringAsFixed(1)}°C',
+                            GoogleFonts.outfit(color: EgTheme.accent, fontWeight: FontWeight.w600, fontSize: 13),
+                          )).toList(),
                         ),
                       ),
                     ),
@@ -456,29 +494,22 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.5)),
+        color: EgTheme.danger.withOpacity(0.08),
+        borderRadius: EgTheme.r12,
+        border: Border.all(color: EgTheme.danger.withOpacity(0.3)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning, color: Colors.red),
+          const Icon(Icons.warning_amber_rounded, color: EgTheme.danger, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Last Alert',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  _lastAlert ?? '',
-                  style: const TextStyle(color: Colors.white),
-                ),
+                Text('Last Alert', style: EgTheme.body(13, color: EgTheme.danger, weight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(_lastAlert ?? '', style: EgTheme.body(13, color: EgTheme.textSecondary)),
               ],
             ),
           ),

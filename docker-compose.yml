@@ -11,6 +11,15 @@ services:
       - mosquitto_log:/mosquitto/log
     restart: unless-stopped
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: egg-mailhog
+    profiles: [email]   # Optional: start with `docker compose --profile email up -d`
+    ports:
+      - "1025:1025"   # SMTP port (API sends to this)
+      - "8025:8025"   # Web UI to view caught emails
+    restart: unless-stopped
+
   postgres:
     image: postgres:15-alpine
     container_name: egg-postgres
@@ -46,6 +55,10 @@ services:
       - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       - DEBUG=${DEBUG:-true}
       - FCM_MOCK_MODE=${FCM_MOCK_MODE:-true}
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_FROM_EMAIL=noreply@egg-guardian.com
+      - SMTP_USE_TLS=false
     volumes:
       - ./services/api:/app
     depends_on:

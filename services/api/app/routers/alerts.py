@@ -14,14 +14,27 @@ from app.services.deps import get_current_user
 router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
 
 
+def check_alert_access(alert: Alert, current_user: User, db: AsyncSession = None):
+    # This requires looking up the device if the alert doesn't contain owner_id,
+    # but we can do that within the endpoint queries more efficiently.
+    pass
+
+
 @router.get("", response_model=list[AlertResponse])
 async def list_alerts(
     db: AsyncSession = Depends(get_db),
     limit: int = 50,
     unacknowledged_only: bool = False,
+    current_user: User = Depends(get_current_user),
 ):
-    """List all alerts, optionally filtering by acknowledgment status."""
-    query = select(Alert).order_by(Alert.triggered_at.desc()).limit(limit)
+    """List all alerts (authenticated)."""
+    query = select(Alert).join(Device, Alert.device_id == Device.id)
+    
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    query = query.order_by(Alert.triggered_at.desc()).limit(limit)
+    
     if unacknowledged_only:
         query = query.where(Alert.is_acknowledged == False)
 
@@ -34,14 +47,19 @@ async def list_alerts(
 async def get_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific alert by ID."""
-    result = await db.execute(select(Alert).where(Alert.id == alert_id))
+    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    result = await db.execute(query)
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Alert not found",
+            detail="Alert not found or unauthorized",
         )
     return alert
 
@@ -50,14 +68,19 @@ async def get_alert(
 async def acknowledge_alert(
     alert_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Acknowledge an alert."""
-    result = await db.execute(select(Alert).where(Alert.id == alert_id))
+    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    result = await db.execute(query)
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Alert not found",
+            detail="Alert not found or unauthorized",
         )
 
     alert.is_acknowledged = True
@@ -70,9 +93,14 @@ async def acknowledge_alert(
 @router.patch("/acknowledge-all", status_code=status.HTTP_200_OK)
 async def acknowledge_all_alerts(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Acknowledge all unacknowledged alerts."""
-    result = await db.execute(select(Alert).where(Alert.is_acknowledged == False))
+    """Acknowledge all unacknowledged alerts for the user's devices."""
+    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.is_acknowledged == False)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    result = await db.execute(query)
     alerts = result.scalars().all()
 
     now = datetime.now(timezone.utc)
@@ -89,14 +117,21 @@ async def list_device_alerts(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     limit: int = 20,
+    current_user: User = Depends(get_current_user),
 ):
     """List alerts for a specific device."""
-    # Verify device exists
     device_result = await db.execute(select(Device).where(Device.id == device_id))
-    if not device_result.scalar_one_or_none():
+    device = device_result.scalar_one_or_none()
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
+        )
+        
+    if not current_user.is_superuser and device.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this device's alerts",
         )
 
     result = await db.execute(
@@ -114,8 +149,12 @@ async def clear_acknowledged_alerts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete all acknowledged alerts (authenticated)."""
-    result = await db.execute(select(Alert).where(Alert.is_acknowledged == True))
+    """Delete all acknowledged alerts (authenticated & authorized)."""
+    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.is_acknowledged == True)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    result = await db.execute(query)
     alerts = result.scalars().all()
 
     count = len(alerts)
@@ -131,8 +170,12 @@ async def delete_all_alerts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete ALL alerts (authenticated)."""
-    result = await db.execute(select(Alert))
+    """Delete ALL alerts (authenticated & authorized)."""
+    query = select(Alert).join(Device, Alert.device_id == Device.id)
+    if not current_user.is_superuser:
+        query = query.where(Device.owner_id == current_user.id)
+        
+    result = await db.execute(query)
     alerts = result.scalars().all()
 
     count = len(alerts)

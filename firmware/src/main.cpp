@@ -21,6 +21,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <ArduinoJson.h>
+#include <time.h>
+#include <sntp.h>
 
 // Include config (copy config.h.example to config.h)
 #include "config.h"
@@ -36,7 +38,7 @@ MQTTClient client;
 // Telemetry buffer for offline storage
 struct TelemetryPoint {
     float temp_c;
-    unsigned long timestamp;
+    time_t timestamp;
 };
 
 TelemetryPoint telemetryBuffer[MAX_BUFFER_SIZE];
@@ -51,9 +53,9 @@ unsigned long lastMqttPublish = 0;
 void connectWiFi();
 void connectMQTT();
 void readTemperature();
-void publishTelemetry(float temp_c);
+void publishTelemetry(float temp_c, time_t timestamp);
 void publishBuffered();
-String formatISO8601(unsigned long timestamp);
+String formatISO8601(time_t timestamp);
 
 void setup() {
     Serial.begin(115200);
@@ -73,6 +75,24 @@ void setup() {
     
     // Connect to WiFi and MQTT
     connectWiFi();
+    
+    // Initialize NTP
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    setenv("TZ", "UTC0", 1);
+    tzset();
+
+    Serial.print("Waiting for NTP time sync: ");
+    time_t now = time(nullptr);
+    while (now < 8 * 3600 * 2) {
+        delay(500);
+        Serial.print(".");
+        now = time(nullptr);
+    }
+    Serial.println("");
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    Serial.print("Current time: ");
+    Serial.println(asctime(&timeinfo));
     
     // Setup MQTT
     client.begin(MQTT_BROKER, MQTT_PORT, net);
@@ -105,7 +125,9 @@ void loop() {
             sensors.requestTemperatures();
             float temp = sensors.getTempCByIndex(0);
             if (temp != DEVICE_DISCONNECTED_C) {
-                publishTelemetry(temp);
+                time_t now;
+                time(&now);
+                publishTelemetry(temp, now);
             }
         }
         lastMqttPublish = millis();
@@ -166,7 +188,9 @@ void readTemperature() {
     // If MQTT disconnected, buffer the reading
     if (!client.connected()) {
         telemetryBuffer[bufferIndex].temp_c = temp;
-        telemetryBuffer[bufferIndex].timestamp = millis();
+        time_t now;
+        time(&now);
+        telemetryBuffer[bufferIndex].timestamp = now;
         bufferIndex = (bufferIndex + 1) % MAX_BUFFER_SIZE;
         if (bufferIndex == 0) bufferFull = true;
         Serial.printf("Buffered reading (count: %d)\n", 
@@ -174,10 +198,10 @@ void readTemperature() {
     }
 }
 
-void publishTelemetry(float temp_c) {
+void publishTelemetry(float temp_c, time_t timestamp) {
     StaticJsonDocument<200> doc;
     doc["device_id"] = DEVICE_ID;
-    doc["ts"] = formatISO8601(millis());
+    doc["ts"] = formatISO8601(timestamp);
     doc["temp_c"] = temp_c;
     
     char payload[200];
@@ -199,7 +223,7 @@ void publishBuffered() {
     Serial.printf("Publishing %d buffered readings...\n", count);
     
     for (int i = 0; i < count; i++) {
-        publishTelemetry(telemetryBuffer[i].temp_c);
+        publishTelemetry(telemetryBuffer[i].temp_c, telemetryBuffer[i].timestamp);
         delay(50);  // Small delay between publishes
     }
     
@@ -208,11 +232,10 @@ void publishBuffered() {
     bufferFull = false;
 }
 
-String formatISO8601(unsigned long timestamp) {
-    // For demo, use a simple timestamp format
-    // In production, use NTP time
+String formatISO8601(time_t timestamp) {
+    struct tm timeinfo;
+    gmtime_r(&timestamp, &timeinfo);
     char buffer[30];
-    snprintf(buffer, sizeof(buffer), "2025-01-01T00:00:%02lu.000Z", 
-             (timestamp / 1000) % 60);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S.000Z", &timeinfo);
     return String(buffer);
 }

@@ -7,62 +7,74 @@ import 'package:egg_guardian/models.dart';
 
 /// WebSocket service for real-time telemetry updates.
 class WebSocketService {
+  static final WebSocketService _instance = WebSocketService._internal();
+  factory WebSocketService() => _instance;
+  WebSocketService._internal();
+
   WebSocketChannel? _channel;
-  StreamController<WsMessage>? _controller;
+  final StreamController<WsMessage> _controller = StreamController<WsMessage>.broadcast();
   String? _currentDeviceId;
   Timer? _reconnectTimer;
   bool _isConnecting = false;
+  bool _isConnected = false;
 
   /// Stream of WebSocket messages.
-  Stream<WsMessage>? get messageStream => _controller?.stream;
+  Stream<WsMessage> get messageStream => _controller.stream;
 
   /// Check if connected.
-  bool get isConnected => _channel != null;
+  bool get isConnected => _isConnected;
 
   /// Connect to a device's telemetry stream.
   Future<void> connect(String deviceId) async {
-    if (_currentDeviceId == deviceId && _channel != null) {
-      return; // Already connected
+    if (_currentDeviceId == deviceId && _isConnected) {
+      return; // Already connected to this device
     }
+
+    // Prevent concurrent connection attempts
+    if (_isConnecting) return;
 
     await disconnect();
 
     _currentDeviceId = deviceId;
     _isConnecting = true;
-    _controller = StreamController<WsMessage>.broadcast();
 
     try {
-      final uri = Uri.parse(
-        '${AppConfig.wsBaseUrl}${AppConfig.wsEndpoint(deviceId)}',
-      );
+      final wsUrl = '${AppConfig.wsBaseUrl}${AppConfig.wsEndpoint(deviceId)}';
+      debugPrint('WebSocket connecting to: $wsUrl');
+      
+      final uri = Uri.parse(wsUrl);
       _channel = WebSocketChannel.connect(uri);
 
       await _channel!.ready;
+      _isConnected = true;
+      _isConnecting = false;
 
       _channel!.stream.listen(
         (data) {
           try {
             final json = jsonDecode(data);
             final message = WsMessage.fromJson(json);
-            _controller?.add(message);
+            _controller.add(message);
           } catch (e) {
             debugPrint('WS parse error: $e');
           }
         },
         onError: (error) {
           debugPrint('WS error: $error');
+          _isConnected = false;
           _scheduleReconnect();
         },
         onDone: () {
           debugPrint('WS connection closed');
+          _isConnected = false;
           _scheduleReconnect();
         },
       );
 
-      _isConnecting = false;
       debugPrint('WebSocket connected to $deviceId');
     } catch (e) {
       debugPrint('WS connect error: $e');
+      _isConnected = false;
       _isConnecting = false;
       _scheduleReconnect();
     }
@@ -72,7 +84,7 @@ class WebSocketService {
   void _scheduleReconnect() {
     if (_reconnectTimer != null || _currentDeviceId == null) return;
 
-    _reconnectTimer = Timer(const Duration(seconds: 3), () {
+    _reconnectTimer = Timer(AppConfig.wsReconnectDelay, () {
       _reconnectTimer = null;
       if (_currentDeviceId != null) {
         connect(_currentDeviceId!);
@@ -85,16 +97,24 @@ class WebSocketService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _currentDeviceId = null;
+    _isConnected = false;
+    _isConnecting = false;
 
-    await _channel?.sink.close();
+    try {
+      await _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
-
-    await _controller?.close();
-    _controller = null;
+    // We never close the broadcast controller so global listeners stay active
   }
 
   /// Send ping to keep connection alive.
   void ping() {
-    _channel?.sink.add(jsonEncode({'type': 'ping'}));
+    if (_isConnected) {
+      try {
+        _channel?.sink.add(jsonEncode({'type': 'ping'}));
+      } catch (_) {
+        _isConnected = false;
+      }
+    }
   }
 }

@@ -72,7 +72,8 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
 
 
 async def create_user(
-    db: AsyncSession, email: str, password: str, full_name: Optional[str] = None
+    db: AsyncSession, email: str, password: str, full_name: Optional[str] = None,
+    job_role: Optional[str] = None, is_superuser: bool = False, is_active: bool = False
 ) -> User:
     """Create a new user."""
     hashed_password = get_password_hash(password)
@@ -80,11 +81,20 @@ async def create_user(
         email=email,
         hashed_password=hashed_password,
         full_name=full_name,
+        job_role=job_role,
+        is_superuser=is_superuser,
+        is_active=is_active,
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
     return user
+
+
+async def get_all_admins(db: AsyncSession) -> list[User]:
+    """Fetch all superuser admins from the database."""
+    result = await db.execute(select(User).where(User.is_superuser == True))
+    return result.scalars().all()
 
 
 async def authenticate_user(
