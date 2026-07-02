@@ -11,14 +11,11 @@ class AppConfig {
   /// Server port (matches docker-compose API port)
   static const int serverPort = int.fromEnvironment('API_PORT', defaultValue: 8000);
 
-  /// API Base URL — auto-detects platform.
-  /// - Android emulator: 10.0.2.2 (maps to host machine's localhost)
-  /// - Android physical device: uses [physicalDeviceServerIp]
-  /// - Web/desktop: localhost
-  static String get apiBaseUrl => 'http://$_serverHost:$serverPort';
+  /// API Base URL
+  static String get apiBaseUrl => 'https://egg-guardian-api.onrender.com';
 
-  /// WebSocket Base URL — auto-detects platform.
-  static String get wsBaseUrl => 'ws://$_serverHost:$serverPort';
+  /// WebSocket Base URL
+  static String get wsBaseUrl => 'wss://egg-guardian-api.onrender.com';
 
   /// Resolved server host based on platform.
   static String get _serverHost {

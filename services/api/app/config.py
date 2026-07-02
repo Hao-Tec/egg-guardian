@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     )
 
     # MQTT - explicit aliases for Docker compatibility
-    mqtt_broker: str = Field(default="localhost", alias="MQTT_BROKER")
+    mqtt_broker: str = Field(default="broker.emqx.io", alias="MQTT_BROKER")
     mqtt_port: int = Field(default=1883, alias="MQTT_PORT")
 
     # JWT

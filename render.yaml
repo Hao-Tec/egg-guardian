@@ -35,6 +35,10 @@ services:
         value: "false"
       - key: CORS_ORIGINS
         value: "*"
+      - key: MQTT_BROKER
+        value: "broker.emqx.io"
+      - key: MQTT_PORT
+        value: "1883"
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

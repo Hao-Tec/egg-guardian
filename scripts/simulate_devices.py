@@ -12,7 +12,7 @@ Args:
     --count: Number of simulated devices (default: 1)
     --rate: Readings per second per device (default: 1)
     --duration: Duration in seconds (default: 30)
-    --broker: MQTT broker address (default: localhost)
+    --broker: MQTT broker address (default: broker.emqx.io)
     --port: MQTT broker port (default: 1883)
 """
 
@@ -76,11 +76,11 @@ def main():
         help="Duration in seconds"
     )
     parser.add_argument(
-        "--broker", type=str, default="localhost",
+        "--broker", type=str, default="broker.emqx.io",
         help="MQTT broker address"
     )
     parser.add_argument(
-        "--port", type=int, default=11883,
+        "--port", type=int, default=1883,
         help="MQTT broker port"
     )
     parser.add_argument(
