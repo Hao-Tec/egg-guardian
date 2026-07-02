@@ -1,10 +1,10 @@
-services:
+databases:
   # 1. Managed PostgreSQL Database
-  - type: psql
-    name: egg-guardian-db
+  - name: egg-guardian-db
     plan: free
     region: ohio
 
+services:
   # 2. FastAPI Backend Service
   - type: web
     name: egg-guardian-api
