@@ -1,16 +1,18 @@
 databases:
-  # 1. Managed PostgreSQL Database
+  # 1. Managed PostgreSQL Database (free tier)
   - name: egg-guardian-db
     plan: free
     region: ohio
 
 services:
   # 2. FastAPI Backend Service
+  # Note: Render no longer offers a free tier for web services.
+  # The cheapest paid option is "starter" ($7/month).
+  # Remove the 'plan' key below to be prompted to choose a plan in the dashboard.
   - type: web
     name: egg-guardian-api
     env: python
     region: ohio
-    plan: free
     buildCommand: "cd services/api && pip install -r requirements.txt"
     startCommand: "cd services/api && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
@@ -19,20 +21,19 @@ services:
           name: egg-guardian-db
           property: connectionString
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: "3.10.0"
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: JWT_ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 30
+        value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
-        value: 7
+        value: "7"
       - key: DEBUG
         value: "false"
       - key: CORS_ORIGINS
         value: "*"
-      # SMTP Settings to be filled in Render Dashboard
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -46,11 +47,10 @@ services:
       - key: SMTP_FROM_EMAIL
         sync: false
 
-  # 3. Static Admin Dashboard
+  # 3. Static Admin Dashboard (always free on Render, no plan field required)
   - type: web
     name: egg-guardian-admin
     env: static
-    plan: free
     buildCommand: ""
     staticPublishPath: "./admin"
     routes:
