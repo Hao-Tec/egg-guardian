@@ -474,7 +474,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen>
                       ],
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (_) => EgTheme.bgElevated,
+                          tooltipBgColor: EgTheme.bgElevated,
                           tooltipRoundedRadius: 8,
                           getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
                             '${s.y.toStringAsFixed(1)}°C',

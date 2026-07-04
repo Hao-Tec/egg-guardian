@@ -444,7 +444,7 @@ class _AdminScreenState extends State<AdminScreen> {
               width: 40, height: 40,
               decoration: BoxDecoration(
                 color: d.isActive ? EgTheme.success.withOpacity(0.1) : EgTheme.textMuted.withOpacity(0.1),
-                borderRadius: EgTheme.r10,
+                borderRadius: EgTheme.r8,
               ),
               child: Icon(Icons.device_thermostat_rounded,
                   color: d.isActive ? EgTheme.success : EgTheme.textMuted, size: 20),
@@ -641,7 +641,7 @@ class _AdminScreenState extends State<AdminScreen> {
             color: EgTheme.bgCard,
             borderRadius: EgTheme.r12,
             border: Border.all(color: dimmed ? EgTheme.border : color.withOpacity(0.4)),
-            ...(dimmed ? {} : {'boxShadow': [BoxShadow(color: color.withOpacity(0.06), blurRadius: 8)]}),
+            boxShadow: dimmed ? null : [BoxShadow(color: color.withOpacity(0.06), blurRadius: 8)],
           ),
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -850,7 +850,7 @@ class _AdminScreenState extends State<AdminScreen> {
   Widget _avatar(String email, Color bg, Color fg, {IconData? icon}) {
     return Container(
       width: 38, height: 38,
-      decoration: BoxDecoration(color: bg, borderRadius: EgTheme.r10),
+      decoration: BoxDecoration(color: bg, borderRadius: EgTheme.r8),
       child: icon != null
           ? Icon(icon, color: fg, size: 18)
           : Center(
