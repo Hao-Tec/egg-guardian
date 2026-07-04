@@ -33,6 +33,8 @@ void main() async {
   // Print FCM token for debugging/backend integration
   FirebaseMessaging.instance.getToken().then((token) {
     debugPrint('FCM Token: $token');
+  }).catchError((e) {
+    debugPrint('Failed to get FCM Token (Firebase not fully configured): $e');
   });
 
   await ApiService().init();
