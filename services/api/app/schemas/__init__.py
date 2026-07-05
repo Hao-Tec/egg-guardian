@@ -30,6 +30,43 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request — provide email."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password using a token received via email."""
+
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least one digit")
+        if not any(char.isalpha() for char in v):
+            raise ValueError("Password must contain at least one letter")
+        return v
+
+
+class AdminPasswordResetRequest(BaseModel):
+    """Admin force-reset a user's password."""
+
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least one digit")
+        if not any(char.isalpha() for char in v):
+            raise ValueError("Password must contain at least one letter")
+        return v
+
+
 # ============== User Schemas ==============
 
 

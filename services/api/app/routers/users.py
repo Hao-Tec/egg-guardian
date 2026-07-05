@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import User
-from app.schemas import UserResponse
+from app.schemas import AdminPasswordResetRequest, UserResponse
+from app.services.auth import update_user_password
 from app.services.deps import get_current_superuser
 from app.services.email import send_account_approved_email
 
@@ -147,4 +148,23 @@ async def toggle_admin_status(
     user.is_superuser = not user.is_superuser
     await db.flush()
     await db.refresh(user)
+    return user
+
+
+@router.patch("/{user_id}/password", response_model=UserResponse)
+async def admin_reset_password(
+    user_id: int,
+    body: AdminPasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(get_current_superuser),
+):
+    """Admin force-reset a user's password (admin only)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    await update_user_password(db, user, body.new_password)
     return user

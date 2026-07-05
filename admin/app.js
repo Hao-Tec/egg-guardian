@@ -498,6 +498,9 @@ function renderUsersList(pending, active) {
                 <button class="btn btn-ghost btn-sm" onclick="toggleAdmin(${u.id})">
                     ${u.is_superuser ? 'Revoke Admin' : 'Make Admin'}
                 </button>
+                <button class="btn btn-ghost btn-sm" onclick="resetUserPassword(${u.id}, '${escapeHtml(u.email)}')" title="Reset Password">
+                    🔑 Reset
+                </button>
                 <button class="icon-btn danger" onclick="confirmDeleteUser(${u.id}, '${escapeHtml(u.email)}')">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                 </button>
@@ -591,6 +594,37 @@ async function toggleAdmin(id) {
         });
         if (res.ok) loadAllData();
     } catch (e) {}
+}
+
+async function resetUserPassword(id, email) {
+    const newPassword = window.prompt(
+        `Reset password for ${email}\n\nEnter a new password (min 8 chars, must contain a letter and a number):`,
+        ''
+    );
+    if (!newPassword) return; // cancelled
+    if (newPassword.length < 8) {
+        showToast('Password must be at least 8 characters.', true);
+        return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        showToast('Password must contain at least one letter and one number.', true);
+        return;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/users/${id}/password`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ new_password: newPassword }),
+        });
+        if (res.ok) {
+            showToast(`Password for ${email} has been reset!`);
+        } else {
+            const err = await res.json();
+            showToast(err.detail || 'Failed to reset password', true);
+        }
+    } catch (e) {
+        showToast('Connection error', true);
+    }
 }
 
 // ── Modals & Deletion ───────────────────────────────────────────────────

@@ -225,6 +225,28 @@ class ApiService {
     throw ApiException(response.statusCode, _parseError(response.body));
   }
 
+  /// Request a password reset email.
+  Future<void> forgotPassword(String email) async {
+    await _request(
+      'POST',
+      '/api/v1/auth/forgot-password',
+      body: {'email': email},
+    );
+    // Always succeeds (server never reveals if email exists)
+  }
+
+  /// Reset password using the token from email.
+  Future<void> resetPassword(String token, String newPassword) async {
+    final response = await _request(
+      'POST',
+      '/api/v1/auth/reset-password',
+      body: {'token': token, 'new_password': newPassword},
+    );
+    if (response.statusCode != 200) {
+      throw ApiException(response.statusCode, _parseError(response.body));
+    }
+  }
+
   /// Update the stored admin status.
   Future<void> setAdminStatus(bool isAdmin) async {
     _isAdmin = isAdmin;
