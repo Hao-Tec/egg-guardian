@@ -49,9 +49,9 @@ def publish_telemetry(
 def on_connect(client, userdata, flags, rc, properties=None):
     """MQTT connection callback."""
     if rc == 0:
-        print("✅ Connected to MQTT broker")
+        print("Connected to MQTT broker")
     else:
-        print(f"❌ Connection failed with code {rc}")
+        print(f"Connection failed with code {rc}")
 
 
 def on_publish(client, userdata, mid, properties=None, reason_code=None):
@@ -104,7 +104,7 @@ def main():
     client.on_connect = on_connect
     client.on_publish = on_publish
     
-    print(f"🥚 Egg Guardian Device Simulator")
+    print(f"Egg Guardian Device Simulator")
     print(f"   Devices: {args.count}")
     print(f"   Rate: {args.rate}/s per device")
     print(f"   Duration: {args.duration}s")
@@ -133,11 +133,11 @@ def main():
         client.disconnect()
         
         print()
-        print(f"✅ Simulation complete!")
+        print(f"Simulation complete!")
         print(f"   Total messages published: {userdata['published']}")
         
     except ConnectionRefusedError:
-        print(f"❌ Could not connect to MQTT broker at {args.broker}:{args.port}")
+        print(f"Could not connect to MQTT broker at {args.broker}:{args.port}")
         print("   Make sure the broker is running (docker-compose up)")
         return 1
     except KeyboardInterrupt:

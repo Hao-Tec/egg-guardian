@@ -169,7 +169,7 @@ async def send_password_reset_email(
     <body>
         <div class="container">
             <div class="header">
-                <h1>🥚 Password Reset</h1>
+                <h1>Password Reset</h1>
             </div>
             <div class="body">
                 <p style="color:#94a3b8; margin-top:0">Hi <strong style="color:#f1f5f9">{user_name}</strong>,</p>
@@ -178,7 +178,7 @@ async def send_password_reset_email(
                     <div style="color:#94a3b8; font-size:0.8rem; margin-bottom:8px">YOUR RESET TOKEN</div>
                     <div class="token">{reset_token}</div>
                 </div>
-                <p class="warning">⚠️ This token expires in <strong>15 minutes</strong>. If you did not request a password reset, please ignore this email — your account is safe.</p>
+                <p class="warning">This token expires in <strong>15 minutes</strong>. If you did not request a password reset, please ignore this email — your account is safe.</p>
             </div>
             <div class="footer">
                 <p>This is an automated notification from the Egg Guardian monitoring system. Do not reply to this email.</p>
@@ -193,3 +193,9 @@ async def send_password_reset_email(
         None,
         partial(_send_email_sync, [user_email], subject, html_body)
     )
+    
+    # Also print to logs for testing/dev without SMTP config
+    print(f"\n{'='*50}")
+    print(f" PASSWORD RESET TOKEN FOR: {user_email}")
+    print(f" TOKEN: {reset_token}")
+    print(f"{'='*50}\n", flush=True)

@@ -86,18 +86,24 @@ const els = {
     liveTempValue: document.getElementById('live-temp-value'),
     
     // Users Tab
-    pendingSection: document.getElementById('pending-section'),
-    pendingCountBadge: document.getElementById('pending-count-badge'),
-    pendingUsersList: document.getElementById('pending-users-list'),
     usersList: document.getElementById('users-list'),
-    userCountTag: document.getElementById('user-count'),
+    userCount: document.getElementById('user-count'),
+    pendingSection: document.getElementById('pending-section'),
+    pendingUsersList: document.getElementById('pending-users-list'),
+    pendingCountBadge: document.getElementById('pending-count-badge'),
     
-    // Modal
+    // Modals
     confirmModal: document.getElementById('confirm-modal'),
     confirmTitle: document.getElementById('confirm-title'),
     confirmBody: document.getElementById('confirm-body'),
-    confirmCancel: document.getElementById('confirm-cancel'),
     confirmOk: document.getElementById('confirm-ok'),
+    confirmCancel: document.getElementById('confirm-cancel'),
+    
+    pwdResetModal: document.getElementById('password-reset-modal'),
+    pwdResetForm: document.getElementById('password-reset-form'),
+    pwdResetInput: document.getElementById('pwd-reset-input'),
+    pwdResetCancelBtn: document.getElementById('pwd-reset-cancel'),
+    pwdResetTitle: document.getElementById('pwd-reset-title'),
     
     // Toast
     toastContainer: document.getElementById('toast-container')
@@ -494,17 +500,18 @@ function renderUsersList(pending, active) {
                 <div class="user-meta">${escapeHtml(u.full_name || 'No name')} • ${escapeHtml(u.job_role || 'No role')}</div>
             </div>
             <div class="user-actions">
-                ${u.id !== currentUser.id ? `
+                ${u.id === currentUser.id ? '<span class="tag">You</span>' : 
+                  (u.id === 1 ? '<span class="tag">Owner</span>' : `
                 <button class="btn btn-ghost btn-sm" onclick="toggleAdmin(${u.id})">
                     ${u.is_superuser ? 'Revoke Admin' : 'Make Admin'}
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="resetUserPassword(${u.id}, '${escapeHtml(u.email)}')" title="Reset Password">
-                    🔑 Reset
+                    Reset
                 </button>
                 <button class="icon-btn danger" onclick="confirmDeleteUser(${u.id}, '${escapeHtml(u.email)}')">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                 </button>
-                ` : '<span class="tag">You</span>'}
+                `)}
             </div>
         </div>
     `).join('');
@@ -596,12 +603,27 @@ async function toggleAdmin(id) {
     } catch (e) {}
 }
 
-async function resetUserPassword(id, email) {
-    const newPassword = window.prompt(
-        `Reset password for ${email}\n\nEnter a new password (min 8 chars, must contain a letter and a number):`,
-        ''
-    );
-    if (!newPassword) return; // cancelled
+let targetResetUserId = null;
+let targetResetUserEmail = null;
+
+function resetUserPassword(id, email) {
+    targetResetUserId = id;
+    targetResetUserEmail = email;
+    els.pwdResetTitle.textContent = `Reset password for ${email}`;
+    els.pwdResetInput.value = '';
+    els.pwdResetModal.classList.remove('hidden');
+}
+
+els.pwdResetCancelBtn.addEventListener('click', () => {
+    els.pwdResetModal.classList.add('hidden');
+    targetResetUserId = null;
+});
+
+els.pwdResetForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!targetResetUserId) return;
+    
+    const newPassword = els.pwdResetInput.value;
     if (newPassword.length < 8) {
         showToast('Password must be at least 8 characters.', true);
         return;
@@ -610,14 +632,16 @@ async function resetUserPassword(id, email) {
         showToast('Password must contain at least one letter and one number.', true);
         return;
     }
+    
     try {
-        const res = await fetch(`${API_BASE}/users/${id}/password`, {
+        const res = await fetch(`${API_BASE}/users/${targetResetUserId}/password`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify({ new_password: newPassword }),
         });
         if (res.ok) {
-            showToast(`Password for ${email} has been reset!`);
+            showToast(`Password for ${targetResetUserEmail} has been reset!`);
+            els.pwdResetModal.classList.add('hidden');
         } else {
             const err = await res.json();
             showToast(err.detail || 'Failed to reset password', true);
@@ -625,7 +649,7 @@ async function resetUserPassword(id, email) {
     } catch (e) {
         showToast('Connection error', true);
     }
-}
+});
 
 // ── Modals & Deletion ───────────────────────────────────────────────────
 

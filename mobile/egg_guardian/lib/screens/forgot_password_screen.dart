@@ -292,7 +292,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        color: EgTheme.textMuted, size: 20,
+                        color: EgTheme.textSecondary, size: 20,
                       ),
                       onPressed: () => setState(() => _obscurePass = !_obscurePass),
                     ),
@@ -315,7 +315,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureConf ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        color: EgTheme.textMuted, size: 20,
+                        color: EgTheme.textSecondary, size: 20,
                       ),
                       onPressed: () => setState(() => _obscureConf = !_obscureConf),
                     ),

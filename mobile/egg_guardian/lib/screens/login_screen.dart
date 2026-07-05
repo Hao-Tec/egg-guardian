@@ -422,8 +422,8 @@ class _LoginScreenState extends State<LoginScreen>
       decoration: EgTheme.inputDecoration('Password', icon: Icons.lock_outline).copyWith(
         suffixIcon: IconButton(
           icon: Icon(
-            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: EgTheme.textMuted,
+            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: EgTheme.textSecondary,
             size: 20,
           ),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),

@@ -212,11 +212,21 @@
             <form id="register-device-form" novalidate>
               <div class="field-group">
                 <label class="field-label" for="device-id">Device ID</label>
-                <input id="device-id" class="field-input" type="text" placeholder="e.g. eggpod-01" />
+                <div class="field-wrap">
+                  <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 2v16m-6-6h12M4 6h12"/>
+                  </svg>
+                  <input id="device-id" class="field-input" type="text" placeholder="e.g. eggpod-01" style="padding-left: 42px;" />
+                </div>
               </div>
               <div class="field-group" style="margin-top:12px">
                 <label class="field-label" for="device-name">Display Name</label>
-                <input id="device-name" class="field-input" type="text" placeholder="e.g. Incubator A" />
+                <div class="field-wrap">
+                  <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                  <input id="device-name" class="field-input" type="text" placeholder="e.g. Incubator A" style="padding-left: 42px;" />
+                </div>
               </div>
               <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px">Register Device</button>
             </form>
@@ -253,18 +263,30 @@
             <form id="alert-rule-form" novalidate>
               <div class="field-group">
                 <label class="field-label" for="rule-device">Device</label>
-                <select id="rule-device" class="field-input field-select">
-                  <option value="">Select a device...</option>
-                </select>
+                <div class="field-wrap">
+                  <select id="rule-device" class="field-input field-select">
+                    <option value="">Select a device...</option>
+                  </select>
+                </div>
               </div>
               <div class="two-col-sm" style="margin-top:12px">
                 <div class="field-group">
                   <label class="field-label" for="rule-min">Min Temp (°C)</label>
-                  <input id="rule-min" class="field-input" type="number" value="35.0" step="0.5" />
+                  <div class="field-wrap">
+                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 14v4m0-16v16m0 0l-3-3m3 3l3-3"/>
+                    </svg>
+                    <input id="rule-min" class="field-input" type="number" value="35.0" step="0.5" style="padding-left: 42px;" />
+                  </div>
                 </div>
                 <div class="field-group">
                   <label class="field-label" for="rule-max">Max Temp (°C)</label>
-                  <input id="rule-max" class="field-input" type="number" value="39.0" step="0.5" />
+                  <div class="field-wrap">
+                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6v12m0-16v16m0-16l3 3m-3-3l-3 3"/>
+                    </svg>
+                    <input id="rule-max" class="field-input" type="number" value="39.0" step="0.5" style="padding-left: 42px;" />
+                  </div>
                 </div>
               </div>
               <button type="submit" class="btn btn-warning btn-full" style="margin-top:16px">Save Thresholds</button>
@@ -342,6 +364,31 @@
         <button id="confirm-cancel" class="btn btn-ghost">Cancel</button>
         <button id="confirm-ok" class="btn btn-danger">Confirm</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Password Reset Modal -->
+  <div id="password-reset-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="pwd-reset-title" class="modal-title">Reset Password</h3>
+      <p id="pwd-reset-body" class="modal-body">Enter a new password for the user.</p>
+      
+      <form id="password-reset-form" style="margin-top: 16px;">
+        <div class="field-group">
+          <label class="field-label" for="pwd-reset-input">New Password</label>
+          <div class="field-wrap">
+            <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="9" width="12" height="8" rx="1.5" stroke-linecap="round"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 9V7a3 3 0 016 0v2"/>
+            </svg>
+            <input id="pwd-reset-input" class="field-input" type="password" placeholder="Min 8 chars, 1 letter, 1 number" style="padding-left: 42px;" required />
+          </div>
+        </div>
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button type="button" id="pwd-reset-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-warning">Reset Password</button>
+        </div>
+      </form>
     </div>
   </div>
 
