@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import User
 from app.schemas import (
+    AdminPasswordResetRequest,
+    ForgotPasswordRequest,
     RefreshTokenRequest,
+    ResetPasswordRequest,
     Token,
     UserCreate,
     UserLogin,
@@ -17,14 +20,16 @@ from app.services.auth import (
     authenticate_user,
     create_access_token,
     create_refresh_token,
+    create_reset_token,
     create_user,
     get_all_admins,
     get_user_by_email,
     get_user_by_id,
+    update_user_password,
     verify_token,
 )
 from app.services.deps import get_current_user
-from app.services.email import send_new_registration_email
+from app.services.email import send_new_registration_email, send_password_reset_email
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -132,3 +137,44 @@ async def get_current_user_info(
 ):
     """Get current authenticated user's information."""
     return current_user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request a password reset. Always returns 200 to avoid leaking whether an email exists."""
+    user = await get_user_by_email(db, request.email)
+    if user and user.is_active:
+        token = create_reset_token(user.id)
+        asyncio.create_task(
+            send_password_reset_email(
+                user_email=user.email,
+                user_name=user.full_name or user.email,
+                reset_token=token,
+            )
+        )
+    return {"message": "If that email is registered, a reset token has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using the token received via email."""
+    user_id = verify_token(request.token, "reset")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+    await update_user_password(db, user, request.new_password)
+    return {"message": "Password has been reset successfully. You can now log in."}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:egg_guardian/screens/forgot_password_screen.dart';
 import 'package:egg_guardian/services/api_service.dart';
 import 'package:egg_guardian/services/session_service.dart';
 import 'package:egg_guardian/theme.dart';
@@ -303,6 +304,30 @@ class _LoginScreenState extends State<LoginScreen>
             if (!_isRegister) ...[
               const SizedBox(height: 8),
               _buildRememberMe(),
+              // Forgot password link
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: EgTheme.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  ),
+                  child: Text(
+                    'Forgot Password?',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: EgTheme.accent,
+                    ),
+                  ),
+                ),
+              ),
             ],
 
             // ── Error banner ──

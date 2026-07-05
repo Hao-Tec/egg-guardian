@@ -138,3 +138,58 @@ async def send_account_approved_email(
         None,
         partial(_send_email_sync, [user_email], subject, html_body)
     )
+
+
+async def send_password_reset_email(
+    user_email: str,
+    user_name: str,
+    reset_token: str,
+) -> None:
+    """Send a password reset email with the one-time token."""
+    subject = "[Egg Guardian] Password Reset Request"
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Arial', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; overflow: hidden; }}
+            .header {{ background: linear-gradient(135deg, #f59e0b, #d97706); padding: 30px; text-align: center; }}
+            .header h1 {{ color: #0f172a; margin: 0; font-size: 1.5rem; font-weight: 700; }}
+            .body {{ padding: 30px; }}
+            .token-box {{ background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+                          padding: 16px 24px; text-align: center; margin: 24px 0; }}
+            .token {{ font-family: monospace; font-size: 1rem; color: #f59e0b;
+                       word-break: break-all; letter-spacing: 0.05em; }}
+            .warning {{ color: #ef4444; font-size: 0.85rem; margin-top: 20px; }}
+            .footer {{ padding: 20px 30px; border-top: 1px solid #334155; color: #64748b; font-size: 0.8rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🥚 Password Reset</h1>
+            </div>
+            <div class="body">
+                <p style="color:#94a3b8; margin-top:0">Hi <strong style="color:#f1f5f9">{user_name}</strong>,</p>
+                <p style="color:#94a3b8">We received a request to reset your Egg Guardian password. Copy the reset token below and paste it into the app to set your new password.</p>
+                <div class="token-box">
+                    <div style="color:#94a3b8; font-size:0.8rem; margin-bottom:8px">YOUR RESET TOKEN</div>
+                    <div class="token">{reset_token}</div>
+                </div>
+                <p class="warning">⚠️ This token expires in <strong>15 minutes</strong>. If you did not request a password reset, please ignore this email — your account is safe.</p>
+            </div>
+            <div class="footer">
+                <p>This is an automated notification from the Egg Guardian monitoring system. Do not reply to this email.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None,
+        partial(_send_email_sync, [user_email], subject, html_body)
+    )

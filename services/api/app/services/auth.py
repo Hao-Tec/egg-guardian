@@ -59,6 +59,20 @@ def verify_token(token: str, token_type: str = "access") -> Optional[int]:
         return None
 
 
+def create_reset_token(user_id: int) -> str:
+    """Create a short-lived (15 min) JWT for password reset."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode = {"sub": str(user_id), "exp": expire, "type": "reset"}
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+async def update_user_password(db: AsyncSession, user: User, new_password: str) -> None:
+    """Hash and persist a new password for the given user."""
+    user.hashed_password = get_password_hash(new_password)
+    await db.flush()
+    await db.refresh(user)
+
+
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """Get user by email."""
     result = await db.execute(select(User).where(User.email == email))
