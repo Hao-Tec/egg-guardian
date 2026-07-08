@@ -27,34 +27,35 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user: User) -> str:
     """Create a JWT access token."""
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    to_encode = {"sub": str(user_id), "exp": expire, "type": "access"}
+    pwd_claim = user.hashed_password[-10:] if user.hashed_password else "none"
+    to_encode = {"sub": str(user.id), "exp": expire, "type": "access", "pwd": pwd_claim}
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user: User) -> str:
     """Create a JWT refresh token."""
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )
-    to_encode = {"sub": str(user_id), "exp": expire, "type": "refresh"}
+    pwd_claim = user.hashed_password[-10:] if user.hashed_password else "none"
+    to_encode = {"sub": str(user.id), "exp": expire, "type": "refresh", "pwd": pwd_claim}
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def verify_token(token: str, token_type: str = "access") -> Optional[int]:
-    """Verify a JWT token and return user ID."""
+def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
+    """Verify a JWT token and return its payload."""
     try:
         payload = jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
         if payload.get("type") != token_type:
             return None
-        user_id = int(payload.get("sub"))
-        return user_id
+        return payload
     except (JWTError, ValueError):
         return None
 

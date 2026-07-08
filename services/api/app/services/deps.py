@@ -25,14 +25,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = verify_token(credentials.credentials, "access")
-    if user_id is None:
+    payload = verify_token(credentials.credentials, "access")
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    user_id = int(payload.get("sub"))
     user = await get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(
@@ -46,6 +47,16 @@ async def get_current_user(
             detail="Inactive user",
         )
 
+    # Validate that password hasn't changed since token was issued
+    pwd_claim = payload.get("pwd")
+    current_pwd_suffix = user.hashed_password[-10:] if user.hashed_password else "none"
+    if pwd_claim and pwd_claim != current_pwd_suffix:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired due to password change. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 
@@ -57,11 +68,22 @@ async def get_optional_user(
     if credentials is None:
         return None
 
-    user_id = verify_token(credentials.credentials, "access")
-    if user_id is None:
+    payload = verify_token(credentials.credentials, "access")
+    if payload is None:
         return None
 
-    return await get_user_by_id(db, user_id)
+    user_id = int(payload.get("sub"))
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        return None
+
+    # Validate that password hasn't changed since token was issued
+    pwd_claim = payload.get("pwd")
+    current_pwd_suffix = user.hashed_password[-10:] if user.hashed_password else "none"
+    if pwd_claim and pwd_claim != current_pwd_suffix:
+        return None
+
+    return user
 
 
 async def get_current_superuser(
