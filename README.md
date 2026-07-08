@@ -2,6 +2,7 @@
 <p align="center">
   <img src="assets/images/logo.jpg" alt="Egg Guardian Logo" width="150" height="150" style="border-radius: 20px;">
 </p>
+
 **Real-time IoT Egg Temperature Monitoring System**
 
 A comprehensive, production-ready IoT solution designed for real-time monitoring of egg incubators. This project leverages a robust architecture featuring a FastAPI backend, a cross-platform Flutter mobile application, an ESP32 hardware firmware component, and a dedicated web-based administrative dashboard. Engineered as a professional solution and Final Year Project, it demonstrates end-to-end integration of MQTT telemetry, secure RESTful APIs, and intelligent alerting mechanisms designed to prevent incubation failure.
