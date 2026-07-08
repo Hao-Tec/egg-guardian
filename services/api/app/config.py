@@ -34,13 +34,11 @@ class Settings(BaseSettings):
     # FCM
     fcm_mock_mode: bool = Field(default=True, alias="FCM_MOCK_MODE")
 
-    # SMTP / Email
-    smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
-    smtp_port: int = Field(default=1025, alias="SMTP_PORT")
-    smtp_user: str = Field(default="", alias="SMTP_USER")
-    smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
-    smtp_from_email: str = Field(default="noreply@egg-guardian.com", alias="SMTP_FROM_EMAIL")
-    smtp_use_tls: bool = Field(default=False, alias="SMTP_USE_TLS")
+    # Google Gmail API / Email
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
+    google_refresh_token: str = Field(default="", alias="GOOGLE_REFRESH_TOKEN")
+    google_sender_email: str = Field(default="noreply@egg-guardian.com", alias="GOOGLE_SENDER_EMAIL")
 
     class Config:
         env_file = ".env"

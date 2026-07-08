@@ -176,7 +176,7 @@ class _AlertBannerState extends State<AlertBanner> with SingleTickerProviderStat
       vsync: this,
     );
     _offsetAnimation = Tween<Offset>(
-      begin: const Offset(0, -1.5),
+      begin: const Offset(0, -4.0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,

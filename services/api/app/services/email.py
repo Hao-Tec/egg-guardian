@@ -1,11 +1,14 @@
-"""Email notification service using SMTP."""
+"""Email notification service using Gmail API."""
 
-import smtplib
+import base64
 import asyncio
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import partial
 from typing import Optional
+
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
 from app.config import get_settings
 
@@ -20,23 +23,35 @@ def _send_email_sync(
     """Synchronous email sending (run in a thread to avoid blocking)."""
     if not to_emails:
         return
+        
+    if not settings.google_refresh_token or not settings.google_client_id:
+        print("[EmailService] Google API credentials missing. Check .env")
+        return
 
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = settings.smtp_from_email
+        msg["From"] = settings.google_sender_email
         msg["To"] = ", ".join(to_emails)
-        msg.attach(MIMEText(html_body, "html"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
-            if settings.smtp_use_tls:
-                server.starttls()
-            if settings.smtp_user and settings.smtp_password:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from_email, to_emails, msg.as_string())
+        encoded_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        create_message = {'raw': encoded_message}
+
+        creds = Credentials(
+            token=None,
+            refresh_token=settings.google_refresh_token,
+            client_id=settings.google_client_id,
+            client_secret=settings.google_client_secret,
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+
+        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+        service.users().messages().send(userId="me", body=create_message).execute()
+        print(f"[EmailService] Successfully sent email via Gmail API to {to_emails}")
     except Exception as e:
         # Log but don't crash — email is non-critical
-        print(f"[EmailService] Failed to send email: {e}")
+        print(f"[EmailService] Failed to send email via Gmail API: {e}")
 
 
 async def send_new_registration_email(
