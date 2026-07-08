@@ -112,13 +112,39 @@ This repository includes a `render.yaml` blueprint for one-click deployment to *
 
 ---
 
-## Email Alerts (SMTP)
+## Email Alerts (Google OAuth)
 
-Egg Guardian utilizes SMTP protocols to dispatch email alerts when an egg pod temperature breaches safe parameters. To configure this utilizing a Gmail account:
-1. Navigate to your Google Account > Security > 2-Step Verification.
-2. Scroll to **App Passwords** and generate a new password designated for "Egg Guardian".
-3. Insert this 16-character password into your `.env` (or Render Dashboard) under `SMTP_PASSWORD`.
-4. Ensure `SMTP_HOST=smtp.gmail.com` and `SMTP_PORT=587`.
+Egg Guardian utilizes the **Gmail REST API** with OAuth2 authentication to dispatch email alerts. This completely bypasses strict SMTP port blocks (like port 25, 465, 587) enforced by modern cloud providers like Render.
+
+To set this up, you must generate an OAuth Refresh Token:
+
+1. **Create a Google Cloud Project**:
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Create a new project (e.g., "Egg Guardian Monitor").
+   - Navigate to **APIs & Services > Library** and enable the **Gmail API**.
+
+2. **Configure OAuth Consent Screen**:
+   - Go to **OAuth consent screen** and select **External**.
+   - Fill in the required details (App name, support email).
+   - *Optional:* Upload the official `assets/images/logo.jpg` as the App Logo.
+   - Under Scopes, add `https://www.googleapis.com/auth/gmail.send`.
+   - Add your own email address as a "Test User".
+
+3. **Create Credentials**:
+   - Go to **Credentials** > **Create Credentials** > **OAuth client ID**.
+   - Select **Desktop app** as the Application type.
+   - Download the generated JSON file and save it as `credentials.json` in the root of this project.
+
+4. **Generate the Refresh Token**:
+   Run the included helper script to perform the OAuth flow:
+   ```bash
+   pip install -r scripts/requirements.txt
+   python scripts/get_google_token.py
+   ```
+   A browser will open asking you to log in. Upon completion, the script will print out your exact `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REFRESH_TOKEN`.
+   
+5. **Update Environment Variables**:
+   Copy those values into your `.env` (or Render Dashboard) and set `GOOGLE_SENDER_EMAIL` to the Gmail address you logged in with.
 
 ---
 

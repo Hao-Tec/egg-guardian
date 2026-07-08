@@ -1,2 +1,6 @@
 # Simulator dependencies
 paho-mqtt>=2.0.0
+
+# Google API OAuth Script dependencies
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.0.0
