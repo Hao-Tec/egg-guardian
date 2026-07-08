@@ -209,27 +209,29 @@
             <div class="card-header">
               <h3 class="card-title">Register New Device</h3>
             </div>
-            <form id="register-device-form" novalidate>
-              <div class="field-group">
-                <label class="field-label" for="device-id">Device ID</label>
-                <div class="field-wrap">
-                  <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 2v16m-6-6h12M4 6h12"/>
-                  </svg>
-                  <input id="device-id" class="field-input" type="text" placeholder="e.g. eggpod-01" style="padding-left: 42px;" />
+            <div class="card-body">
+              <form id="register-device-form" novalidate>
+                <div class="field-group">
+                  <label class="field-label" for="device-id">Device ID</label>
+                  <div class="field-wrap">
+                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 2v16m-6-6h12M4 6h12"/>
+                    </svg>
+                    <input id="device-id" class="field-input" type="text" placeholder="e.g. eggpod-01" style="padding-left: 42px;" />
+                  </div>
                 </div>
-              </div>
-              <div class="field-group" style="margin-top:12px">
-                <label class="field-label" for="device-name">Display Name</label>
-                <div class="field-wrap">
-                  <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                  </svg>
-                  <input id="device-name" class="field-input" type="text" placeholder="e.g. Incubator A" style="padding-left: 42px;" />
+                <div class="field-group" style="margin-top:12px">
+                  <label class="field-label" for="device-name">Display Name</label>
+                  <div class="field-wrap">
+                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    <input id="device-name" class="field-input" type="text" placeholder="e.g. Incubator A" style="padding-left: 42px;" />
+                  </div>
                 </div>
-              </div>
-              <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px">Register Device</button>
-            </form>
+                <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px">Register Device</button>
+              </form>
+            </div>
           </div>
 
           <!-- Devices table -->
@@ -260,37 +262,39 @@
             <div class="card-header">
               <h3 class="card-title">Alert Thresholds</h3>
             </div>
-            <form id="alert-rule-form" novalidate>
-              <div class="field-group">
-                <label class="field-label" for="rule-device">Device</label>
-                <div class="field-wrap">
-                  <select id="rule-device" class="field-input field-select">
-                    <option value="">Select a device...</option>
-                  </select>
-                </div>
-              </div>
-              <div class="two-col-sm" style="margin-top:12px">
+            <div class="card-body">
+              <form id="alert-rule-form" novalidate>
                 <div class="field-group">
-                  <label class="field-label" for="rule-min">Min Temp (°C)</label>
+                  <label class="field-label" for="rule-device">Device</label>
                   <div class="field-wrap">
-                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 14v4m0-16v16m0 0l-3-3m3 3l3-3"/>
-                    </svg>
-                    <input id="rule-min" class="field-input" type="number" value="35.0" step="0.5" style="padding-left: 42px;" />
+                    <select id="rule-device" class="field-input field-select">
+                      <option value="">Select a device...</option>
+                    </select>
                   </div>
                 </div>
-                <div class="field-group">
-                  <label class="field-label" for="rule-max">Max Temp (°C)</label>
-                  <div class="field-wrap">
-                    <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6v12m0-16v16m0-16l3 3m-3-3l-3 3"/>
-                    </svg>
-                    <input id="rule-max" class="field-input" type="number" value="39.0" step="0.5" style="padding-left: 42px;" />
+                <div class="two-col-sm" style="margin-top:12px">
+                  <div class="field-group">
+                    <label class="field-label" for="rule-min">Min Temp (°C)</label>
+                    <div class="field-wrap">
+                      <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 14v4m0-16v16m0 0l-3-3m3 3l3-3"/>
+                      </svg>
+                      <input id="rule-min" class="field-input" type="number" value="35.0" step="0.5" style="padding-left: 42px;" />
+                    </div>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label" for="rule-max">Max Temp (°C)</label>
+                    <div class="field-wrap">
+                      <svg class="field-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6v12m0-16v16m0-16l3 3m-3-3l-3 3"/>
+                      </svg>
+                      <input id="rule-max" class="field-input" type="number" value="39.0" step="0.5" style="padding-left: 42px;" />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <button type="submit" class="btn btn-warning btn-full" style="margin-top:16px">Save Thresholds</button>
-            </form>
+                <button type="submit" class="btn btn-warning btn-full" style="margin-top:16px">Save Thresholds</button>
+              </form>
+            </div>
           </div>
 
           <!-- Live monitor -->

@@ -377,11 +377,11 @@ class ApiService {
   }
 
   /// Get device telemetry history.
-  Future<TelemetryHistory> getTelemetry(int deviceId, {int hours = 24}) async {
+  Future<TelemetryHistory> getTelemetry(int deviceId, {int hours = 24, int? limit}) async {
     try {
       final response = await _request(
         'GET',
-        AppConfig.telemetryEndpoint(deviceId, hours: hours),
+        AppConfig.telemetryEndpoint(deviceId, hours: hours, limit: limit),
         requiresAuth: true,
       );
 

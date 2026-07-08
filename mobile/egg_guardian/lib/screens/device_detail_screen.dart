@@ -96,7 +96,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen>
   Future<void> _pollLatestData() async {
     if (_isLoading || !mounted) return;
     try {
-      final history = await ApiService().getTelemetry(widget.device.id, hours: 24);
+      final history = await ApiService().getTelemetry(widget.device.id, hours: 24, limit: 1);
       if (!mounted || history.readings.isEmpty) return;
       final latest = history.readings.first;
       if (history.count > _lastReadingCount || latest.tempC != _currentTemp) {
