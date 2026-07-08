@@ -100,8 +100,8 @@ async def login(
         )
 
     return Token(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
     )
 
 
@@ -111,12 +111,13 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
 ):
     """Refresh access token using refresh token."""
-    user_id = verify_token(request.refresh_token, "refresh")
-    if user_id is None:
+    payload = verify_token(request.refresh_token, "refresh")
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
         )
+    user_id = int(payload.get("sub"))
 
     user = await get_user_by_id(db, user_id)
     if not user or not user.is_active:
@@ -125,9 +126,18 @@ async def refresh_token(
             detail="User not found or inactive",
         )
 
+    # Validate that password hasn't changed since token was issued
+    pwd_claim = payload.get("pwd")
+    current_pwd_suffix = user.hashed_password[-10:] if user.hashed_password else "none"
+    if pwd_claim and pwd_claim != current_pwd_suffix:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired due to password change. Please log in again.",
+        )
+
     return Token(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user),
+        refresh_token=create_refresh_token(user),
     )
 
 
@@ -164,12 +174,13 @@ async def reset_password(
     db: AsyncSession = Depends(get_db),
 ):
     """Reset password using the token received via email."""
-    user_id = verify_token(request.token, "reset")
-    if user_id is None:
+    payload = verify_token(request.token, "reset")
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token.",
         )
+    user_id = int(payload.get("sub"))
     user = await get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(

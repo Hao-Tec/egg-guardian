@@ -49,8 +49,13 @@ class AppConfig {
   static String wsEndpoint(String deviceId) => '/api/v1/ws/$deviceId';
 
   /// Telemetry endpoint
-  static String telemetryEndpoint(int deviceId, {int hours = 24}) =>
-      '/api/v1/devices/$deviceId/telemetry?hours=$hours';
+  static String telemetryEndpoint(int deviceId, {int hours = 24, int? limit}) {
+    String url = '/api/v1/devices/$deviceId/telemetry?hours=$hours';
+    if (limit != null) {
+      url += '&limit=$limit';
+    }
+    return url;
+  }
 
   /// Alert rules endpoint
   static String rulesEndpoint(int deviceId) =>
