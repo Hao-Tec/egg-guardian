@@ -38,10 +38,7 @@ async def list_devices(
     from sqlalchemy import func
     from app.models import Telemetry, AlertRule
 
-    if current_user.is_superuser:
-        query = select(Device).order_by(Device.created_at.desc())
-    else:
-        query = select(Device).where(Device.owner_id == current_user.id).order_by(Device.created_at.desc())
+    query = select(Device).order_by(Device.created_at.desc())
 
     result = await db.execute(query)
     devices = result.scalars().all()
@@ -113,7 +110,7 @@ async def get_device(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
-    check_device_access(device, current_user)
+    # Removed check_device_access to allow all users to view the device
     
     from app.models import AlertRule
     rule_result = await db.execute(

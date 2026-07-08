@@ -30,8 +30,7 @@ async def list_alerts(
     """List all alerts (authenticated)."""
     query = select(Alert).join(Device, Alert.device_id == Device.id)
     
-    if not current_user.is_superuser:
-        query = query.where(Device.owner_id == current_user.id)
+    # No access check to allow all users to view alerts
         
     query = query.order_by(Alert.triggered_at.desc()).limit(limit)
     
@@ -51,8 +50,7 @@ async def get_alert(
 ):
     """Get a specific alert by ID."""
     query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
-    if not current_user.is_superuser:
-        query = query.where(Device.owner_id == current_user.id)
+    # No access check to allow all users to view alerts
         
     result = await db.execute(query)
     alert = result.scalar_one_or_none()
@@ -72,8 +70,7 @@ async def acknowledge_alert(
 ):
     """Acknowledge an alert."""
     query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
-    if not current_user.is_superuser:
-        query = query.where(Device.owner_id == current_user.id)
+    # No access check to allow all users to acknowledge alerts
         
     result = await db.execute(query)
     alert = result.scalar_one_or_none()
@@ -97,8 +94,7 @@ async def acknowledge_all_alerts(
 ):
     """Acknowledge all unacknowledged alerts for the user's devices."""
     query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.is_acknowledged == False)
-    if not current_user.is_superuser:
-        query = query.where(Device.owner_id == current_user.id)
+    # No access check to allow all users to acknowledge alerts
         
     result = await db.execute(query)
     alerts = result.scalars().all()

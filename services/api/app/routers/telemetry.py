@@ -76,12 +76,7 @@ async def get_device_telemetry(
             detail="Device not found",
         )
 
-    # Check access
-    if not current_user.is_superuser and device.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this device's telemetry",
-        )
+    # Access check removed to allow all users to view telemetry
 
     # Get telemetry within time window
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
