@@ -287,8 +287,11 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               Container(
                 width: 32, height: 32,
-                decoration: BoxDecoration(gradient: EgTheme.accentGradient, borderRadius: EgTheme.r8),
-                child: const Icon(Icons.egg_outlined, color: Colors.black, size: 16),
+                decoration: BoxDecoration(borderRadius: EgTheme.r8),
+                child: ClipRRect(
+                  borderRadius: EgTheme.r8,
+                  child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(

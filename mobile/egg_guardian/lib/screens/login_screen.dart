@@ -216,17 +216,18 @@ class _LoginScreenState extends State<LoginScreen>
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [EgTheme.accentLight, EgTheme.accentDark],
-            ),
             borderRadius: EgTheme.r16,
             boxShadow: [
               BoxShadow(color: EgTheme.accent.withOpacity(0.35), blurRadius: 24, spreadRadius: 2),
             ],
           ),
-          child: const Icon(Icons.egg_outlined, color: Colors.black, size: 36),
+          child: ClipRRect(
+            borderRadius: EgTheme.r16,
+            child: Image.asset(
+              'assets/logo.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         ShaderMask(
