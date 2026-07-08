@@ -373,7 +373,7 @@ function updateUI() {
     updateDeviceSelect();
     
     // Users Tab
-    els.userCountTag.textContent = users.length - pendingUsers.length;
+    els.userCount.textContent = users.length - pendingUsers.length;
     renderUsersList(pendingUsers, users.filter(u => u.is_active));
 }
 
