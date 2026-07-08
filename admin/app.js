@@ -390,11 +390,11 @@ function updateBadge(el, count) {
 
 function renderDeviceList(container, list, compact) {
     if (list.length === 0) {
-        container.innerHTML = '<p class="empty-msg">No devices found.</p>';
+        if (container.innerHTML !== '<p class="empty-msg">No devices found.</p>') container.innerHTML = '<p class="empty-msg">No devices found.</p>';
         return;
     }
     
-    container.innerHTML = list.map(d => `
+    const html = list.map(d => `
         <div class="device-row">
             <div class="device-icon" style="background: ${d.is_active ? 'rgba(16,185,129,.1)' : 'rgba(71,85,105,.1)'}; color: ${d.is_active ? 'var(--success)' : 'var(--text-muted)'}">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
@@ -414,24 +414,29 @@ function renderDeviceList(container, list, compact) {
             </div>` : ''}
         </div>
     `).join('');
+    
+    if (container.innerHTML !== html) container.innerHTML = html;
 }
 
 function updateDeviceSelect() {
     const currentVal = els.ruleDevice.value;
-    els.ruleDevice.innerHTML = '<option value="">Select a device...</option>' + 
+    const html = '<option value="">Select a device...</option>' + 
         devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
-    if (currentVal && devices.some(d => d.id == currentVal)) {
-        els.ruleDevice.value = currentVal;
+    if (els.ruleDevice.innerHTML !== html) {
+        els.ruleDevice.innerHTML = html;
+        if (currentVal && devices.some(d => d.id == currentVal)) {
+            els.ruleDevice.value = currentVal;
+        }
     }
 }
 
 function renderAlertsList() {
     if (triggeredAlerts.length === 0) {
-        els.alertsList.innerHTML = '<p class="empty-msg">No alerts triggered.</p>';
+        if (els.alertsList.innerHTML !== '<p class="empty-msg">No alerts triggered.</p>') els.alertsList.innerHTML = '<p class="empty-msg">No alerts triggered.</p>';
         return;
     }
     
-    els.alertsList.innerHTML = triggeredAlerts.map(a => {
+    const html = triggeredAlerts.map(a => {
         const isHigh = a.alert_type === 'high';
         const dName = devices.find(d => d.id === a.device_id)?.name || `Device #${a.device_id}`;
         const time = new Date(a.triggered_at).toLocaleString();
@@ -455,13 +460,14 @@ function renderAlertsList() {
             </div>
         `;
     }).join('');
+    if (els.alertsList.innerHTML !== html) els.alertsList.innerHTML = html;
 }
 
 function renderUsersList(pending, active) {
     if (pending.length > 0) {
         els.pendingCountBadge.textContent = pending.length;
         els.pendingSection.classList.remove('hidden');
-        els.pendingUsersList.innerHTML = pending.map(u => `
+        const html = pending.map(u => `
             <div class="pending-user-row">
                 <div class="user-avatar" style="background: rgba(245,158,11,.15); color: var(--accent)">
                     ${u.email.charAt(0).toUpperCase()}
@@ -478,16 +484,17 @@ function renderUsersList(pending, active) {
                 </div>
             </div>
         `).join('');
+        if (els.pendingUsersList.innerHTML !== html) els.pendingUsersList.innerHTML = html;
     } else {
         els.pendingSection.classList.add('hidden');
     }
     
     if (active.length === 0) {
-        els.usersList.innerHTML = '<p class="empty-msg">No active users.</p>';
+        if (els.usersList.innerHTML !== '<p class="empty-msg">No active users.</p>') els.usersList.innerHTML = '<p class="empty-msg">No active users.</p>';
         return;
     }
     
-    els.usersList.innerHTML = active.map(u => `
+    const html2 = active.map(u => `
         <div class="user-row">
             <div class="user-avatar" style="background: ${u.is_superuser ? 'rgba(245,158,11,.15)' : 'var(--bg-elevated)'}; color: ${u.is_superuser ? 'var(--accent)' : 'var(--text-secondary)'}">
                 ${u.email.charAt(0).toUpperCase()}
@@ -515,6 +522,7 @@ function renderUsersList(pending, active) {
             </div>
         </div>
     `).join('');
+    if (els.usersList.innerHTML !== html2) els.usersList.innerHTML = html2;
 }
 
 // ── API Actions ─────────────────────────────────────────────────────────
@@ -752,10 +760,9 @@ function setupWebSocket(dbId) {
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.origin.includes('localhost') ? 'localhost:8000' : 'egg-guardian-api.onrender.com';
-    ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/dashboard`);
+    ws = new WebSocket(`${wsProtocol}//${wsHost}/api/v1/ws/${d.device_id}`);
     
     ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'subscribe', channel: d.device_id }));
         els.wsStatus.className = 'status-pill status-connected';
         els.wsStatus.textContent = 'Connected';
     };
@@ -763,12 +770,13 @@ function setupWebSocket(dbId) {
     ws.onmessage = (e) => {
         try {
             const data = JSON.parse(e.data);
-            if (data.type === 'telemetry' && data.device_id === d.device_id) {
-                els.liveTempValue.textContent = data.temperature.toFixed(1);
+            if (data.type === 'telemetry' && data.device_id === d.device_id && data.data && data.data.temp_c !== undefined) {
+                const tempC = data.data.temp_c;
+                els.liveTempValue.textContent = tempC.toFixed(1);
                 
                 if (chart) {
                     chart.data.labels.push('');
-                    chart.data.datasets[0].data.push(data.temperature);
+                    chart.data.datasets[0].data.push(tempC);
                     if (chart.data.datasets[0].data.length > 30) {
                         chart.data.labels.shift();
                         chart.data.datasets[0].data.shift();
