@@ -22,9 +22,27 @@ def init_fcm():
         _fcm_initialized = True
         return
 
+    # Option 1: Parse from Environment Variable (Best for Render/Heroku)
+    import json
+    cert_env = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if cert_env:
+        try:
+            cert_dict = json.loads(cert_env)
+            cred = credentials.Certificate(cert_dict)
+            firebase_admin.initialize_app(cred)
+            _fcm_initialized = True
+            logger.info("Firebase Admin SDK initialized successfully from environment variable.")
+            return
+        except Exception as e:
+            logger.error(f"Failed to initialize Firebase Admin SDK from env var: {e}")
+            settings.fcm_mock_mode = True
+            _fcm_initialized = True
+            return
+
+    # Option 2: Parse from local file
     cred_path = "firebase-adminsdk.json"
     if not os.path.exists(cred_path):
-        logger.warning(f"FCM credentials not found at {cred_path}. Falling back to MOCK mode.")
+        logger.warning(f"FCM credentials not found at {cred_path} and FIREBASE_SERVICE_ACCOUNT_JSON not set. Falling back to MOCK mode.")
         settings.fcm_mock_mode = True
         _fcm_initialized = True
         return
