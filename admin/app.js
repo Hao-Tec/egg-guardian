@@ -177,10 +177,6 @@ function setupEventListeners() {
             }
         });
     }
-
-    els.ruleDevice.addEventListener('change', () => {
-        setupWebSocket(els.ruleDevice.value);
-    });
 }
 
 async function checkAuth() {
