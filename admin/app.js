@@ -143,6 +143,41 @@ function setupEventListeners() {
     
     // Alerts
     els.ackAllBtn.addEventListener('click', acknowledgeAllAlerts);
+    
+    // Live Monitor
+    const clearBtn = document.getElementById('btn-clear-chart');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (confirm("Are you sure you want to clear the graph data from your screen?")) {
+                if (chart) {
+                    chart.data.labels = [];
+                    chart.data.datasets[0].data = [];
+                    chart.update();
+                    els.liveTempValue.textContent = '—';
+                }
+            }
+        });
+    }
+    const liveSelect = document.getElementById('live-device-select');
+    if (liveSelect) {
+        liveSelect.addEventListener('change', (e) => {
+            const dbId = e.target.value;
+            if (dbId) {
+                setupWebSocket(dbId);
+            } else {
+                if (ws) ws.close();
+                els.wsStatus.textContent = 'Connecting';
+                els.wsStatus.className = 'status-pill status-syncing';
+                els.liveTempValue.textContent = '—';
+                if (chart) {
+                    chart.data.labels = [];
+                    chart.data.datasets[0].data = [];
+                    chart.update();
+                }
+            }
+        });
+    }
+
     els.ruleDevice.addEventListener('change', () => {
         setupWebSocket(els.ruleDevice.value);
     });
@@ -372,6 +407,7 @@ function updateUI() {
     }
     renderAlertsList();
     updateDeviceSelect();
+    updateLiveDeviceSelect();
     
     // Users Tab
     els.userCount.textContent = users.length - pendingUsers.length;
@@ -418,6 +454,20 @@ function renderDeviceList(container, list, compact) {
     `).join('');
     
     if (container.innerHTML !== html) container.innerHTML = html;
+}
+
+function updateLiveDeviceSelect() {
+    const select = document.getElementById('live-device-select');
+    if (!select) return;
+    const currentVal = select.value;
+    const html = '<option value="">Select Device...</option>' + 
+        devices.map(d => `<option value="${d.id}">${escapeHtml(d.device_id)}</option>`).join('');
+    if (select.innerHTML !== html) {
+        select.innerHTML = html;
+        if (currentVal && devices.some(d => d.id == currentVal)) {
+            select.value = currentVal;
+        }
+    }
 }
 
 function updateDeviceSelect() {
@@ -739,21 +789,6 @@ function initChart() {
             animation: false
         }
     });
-
-    // Setup clear button
-    const clearBtn = document.getElementById('btn-clear-chart');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (confirm("Are you sure you want to clear the graph data from your screen?")) {
-                if (chart) {
-                    chart.data.labels = [];
-                    chart.data.datasets[0].data = [];
-                    chart.update();
-                    els.liveTempValue.textContent = '—';
-                }
-            }
-        });
-    }
 }
 
 function setupWebSocket(dbId) {
