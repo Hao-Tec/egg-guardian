@@ -79,12 +79,16 @@ const els = {
     ruleMin: document.getElementById('rule-min'),
     ruleMax: document.getElementById('rule-max'),
     alertsList: document.getElementById('alerts-list'),
+    alertRulesList: document.getElementById('alert-rules-list'),
     pendingAlertsCount: document.getElementById('pending-alerts-count'),
     ackAllBtn: document.getElementById('ack-all-btn'),
     
-    // Live Monitor
+    // Live Monitor Tab
     wsStatus: document.getElementById('ws-status'),
     liveTempValue: document.getElementById('live-temp-value'),
+    liveTempHint: document.getElementById('live-temp-hint'),
+    liveThresholdRow: document.getElementById('live-threshold-row'),
+    liveThresholdLabel: document.getElementById('live-threshold-label'),
     
     // Users Tab
     usersList: document.getElementById('users-list'),
@@ -404,6 +408,7 @@ function updateUI() {
     renderAlertsList();
     updateDeviceSelect();
     updateLiveDeviceSelect();
+    renderAlertRulesList();
     
     // Users Tab
     els.userCount.textContent = users.length - pendingUsers.length;
@@ -456,14 +461,36 @@ function updateLiveDeviceSelect() {
     const select = document.getElementById('live-device-select');
     if (!select) return;
     const currentVal = select.value;
-    const html = '<option value="">Select Device...</option>' + 
-        devices.map(d => `<option value="${d.id}">${escapeHtml(d.device_id)}</option>`).join('');
+    const html = '<option value="">— Select a device to monitor —</option>' + 
+        devices.map(d => `<option value="${d.id}">${escapeHtml(d.name || d.device_id)}</option>`).join('');
     if (select.innerHTML !== html) {
         select.innerHTML = html;
         if (currentVal && devices.some(d => d.id == currentVal)) {
             select.value = currentVal;
         }
     }
+}
+
+function renderAlertRulesList() {
+    if (!els.alertRulesList) return;
+    if (!devices || devices.length === 0) {
+        els.alertRulesList.innerHTML = '<p class="empty-msg">No alert rules configured.</p>';
+        return;
+    }
+    const rulesDevices = devices.filter(d => d.temp_min !== undefined && d.temp_max !== undefined);
+    if (rulesDevices.length === 0) {
+        els.alertRulesList.innerHTML = '<p class="empty-msg">No alert rules configured.</p>';
+        return;
+    }
+    els.alertRulesList.innerHTML = rulesDevices.map(d => `
+        <div class="device-row">
+            <div class="device-info">
+                <div class="device-name">${escapeHtml(d.name || d.device_id)}</div>
+                <div class="device-id">${escapeHtml(d.device_id)}</div>
+            </div>
+            <span class="status-pill status-connected" style="font-size:11px;">${d.temp_min.toFixed(1)}°C – ${d.temp_max.toFixed(1)}°C</span>
+        </div>
+    `).join('');
 }
 
 function updateDeviceSelect() {
@@ -773,15 +800,53 @@ function initChart() {
     const ctx = canvas.getContext('2d');
     chart = new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ data: [], borderColor: '#F59E0B', borderWidth: 2, tension: 0.4, pointRadius: 2, backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true }] },
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Temperature (°C)',
+                data: [],
+                borderColor: '#F59E0B',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                fill: true
+            }]
+        },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { 
-                x: { display: true, grid: { display: false }, ticks: { maxRotation: 0, font: {size: 10} } }, 
-                y: { display: true, min: 33, max: 42, grid: { color: 'rgba(200,200,200,0.1)' } } 
+            scales: {
+                x: {
+                    display: true,
+                    grid: { display: false },
+                    ticks: {
+                        maxRotation: 0,
+                        maxTicksLimit: 8,
+                        font: { size: 11 },
+                        color: 'rgba(150,150,150,0.9)'
+                    },
+                    title: { display: true, text: 'Time', font: { size: 11 }, color: 'rgba(150,150,150,0.8)' }
+                },
+                y: {
+                    display: true,
+                    min: 33,
+                    max: 42,
+                    grid: { color: 'rgba(200,200,200,0.08)' },
+                    ticks: { font: { size: 11 }, color: 'rgba(150,150,150,0.9)', callback: v => v + '°C' },
+                    title: { display: true, text: 'Temp (°C)', font: { size: 11 }, color: 'rgba(150,150,150,0.8)' }
+                }
             },
-            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    enabled: true,
+                    callbacks: {
+                        label: ctx => ` ${ctx.parsed.y.toFixed(2)}°C`
+                    }
+                }
+            },
             animation: false
         }
     });
@@ -790,29 +855,39 @@ function initChart() {
 function setupWebSocket(dbId) {
     if (ws) ws.close();
     
-    // Find device_id string from db ID
     const d = devices.find(x => x.id == dbId);
     if (!d) {
         els.wsStatus.className = 'status-pill status-syncing';
         els.wsStatus.textContent = 'Select Device';
         els.liveTempValue.textContent = '—';
+        if (els.liveTempHint) els.liveTempHint.textContent = 'Select a device above to start monitoring';
         return;
     }
-    
+
+    // Show threshold badge
+    if (els.liveThresholdRow && d.temp_min !== undefined) {
+        els.liveThresholdRow.style.display = 'flex';
+        els.liveThresholdLabel.textContent = `${d.temp_min.toFixed(1)}°C – ${d.temp_max.toFixed(1)}°C`;
+    }
+    if (els.liveTempHint) els.liveTempHint.textContent = `Monitoring: ${d.name || d.device_id}`;
+
     if (!chart && window.Chart) initChart();
     if (chart) {
         chart.data.labels = [];
         chart.data.datasets[0].data = [];
         chart.update();
         
-        // Fetch historical data
-        apiCall(`/devices/${dbId}/telemetry?hours=1&limit=50`).then(res => {
+        // Fetch historical data (last 2 hours)
+        apiCall(`/devices/${dbId}/telemetry?hours=2&limit=80`).then(res => {
             if (res && res.readings && chart) {
-                const readings = res.readings.reverse(); // oldest first
-                chart.data.labels = readings.map(r => new Date(r.recorded_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                const readings = [...res.readings].reverse(); // oldest first
+                chart.data.labels = readings.map(r => {
+                    const d = new Date(r.recorded_at);
+                    return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+                });
                 chart.data.datasets[0].data = readings.map(r => r.temp_c);
                 if (readings.length > 0) {
-                    els.liveTempValue.textContent = readings[readings.length-1].temp_c.toFixed(1);
+                    els.liveTempValue.textContent = readings[readings.length - 1].temp_c.toFixed(1);
                 }
                 chart.update();
             }
@@ -839,10 +914,10 @@ function setupWebSocket(dbId) {
                 els.liveTempValue.textContent = tempC.toFixed(1);
                 
                 if (chart) {
-                    const timeStr = new Date(data.data.recorded_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const timeStr = new Date(data.data.recorded_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
                     chart.data.labels.push(timeStr);
                     chart.data.datasets[0].data.push(tempC);
-                    if (chart.data.datasets[0].data.length > 50) {
+                    if (chart.data.datasets[0].data.length > 80) {
                         chart.data.labels.shift();
                         chart.data.datasets[0].data.shift();
                     }

@@ -72,6 +72,12 @@
           </svg>
           Overview
         </button>
+        <button class="nav-item" data-tab="monitor" id="nav-monitor">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+          </svg>
+          Live Monitor
+        </button>
         <button class="nav-item" data-tab="devices" id="nav-devices">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
@@ -194,6 +200,62 @@
         </div>
       </section>
 
+      <!-- ── TAB: LIVE MONITOR ──────────────────────────────────────── -->
+      <section id="tab-monitor" class="tab-content">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Live Monitor</h2>
+            <p class="page-subtitle">Real-time temperature feed from incubator devices</p>
+          </div>
+        </div>
+
+        <!-- Device selector + status bar -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-body" style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px;">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" style="color: var(--text-muted); flex-shrink:0;">
+                <path fill-rule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+              </svg>
+              <select id="live-device-select" class="field-input field-select" style="flex: 1; max-width: 300px; height: 38px;">
+                <option value="">— Select a device to monitor —</option>
+              </select>
+            </div>
+            <span id="ws-status" class="status-pill status-syncing">Select Device</span>
+            <button id="btn-clear-chart" class="btn btn-warning btn-sm" style="white-space:nowrap;">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px;">
+                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+              </svg>
+              Clear Graph
+            </button>
+          </div>
+        </div>
+
+        <!-- Big temperature display + chart -->
+        <div class="card">
+          <div class="card-body" style="padding: 24px;">
+            <!-- Current temp big display -->
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 24px;">
+              <div id="live-temp-value" class="live-temp-value" style="font-size: 3.5rem; line-height:1;">—</div>
+              <div id="live-temp-unit" class="live-temp-unit" style="font-size: 1.5rem;">°C</div>
+              <div style="margin-left: 16px; font-size: 13px; color: var(--text-muted);" id="live-temp-hint">Select a device above to start monitoring</div>
+            </div>
+
+            <!-- Safe zone info row -->
+            <div id="live-threshold-row" style="display: none; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
+              <span style="font-size: 12px; background: rgba(16,185,129,0.1); color: #10B981; padding: 4px 10px; border-radius: 20px;">
+                ✓ Safe Range: <span id="live-threshold-label">—</span>
+              </span>
+            </div>
+
+            <!-- Chart container - large -->
+            <div style="position: relative; height: 300px; width: 100%; overflow: hidden;">
+              <canvas id="live-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 8px;">Temperature over time (last 50 readings)</div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── TAB: DEVICES ───────────────────────────────────────────── -->
       <section id="tab-devices" class="tab-content">
         <div class="page-header">
@@ -297,24 +359,13 @@
             </div>
           </div>
 
-          <!-- Live monitor -->
-          <div class="card" id="live-monitor-card">
+          <!-- Configured rules -->
+          <div class="card">
             <div class="card-header">
-              <h3 class="card-title">Live Monitor</h3>
-              <div class="header-actions" style="display:flex; align-items:center; gap:10px;">
-                <select id="live-device-select" class="form-control form-control-sm" style="width: auto; padding: 2px 6px; font-size: 12px;">
-                  <option value="">Select Device...</option>
-                </select>
-                <span id="ws-status" class="status-pill status-syncing">Select Device</span>
-                <button id="btn-clear-chart" class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 12px;">Clear</button>
-              </div>
+              <h3 class="card-title">Configured Rules</h3>
             </div>
-            <div class="live-temp-display">
-              <div id="live-temp-value" class="live-temp-value">—</div>
-              <div id="live-temp-unit" class="live-temp-unit">°C</div>
-            </div>
-            <div style="position: relative; height: 120px; width: 100%; overflow: hidden;">
-              <canvas id="live-chart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+            <div id="alert-rules-list" class="list-stack">
+              <p class="empty-msg">No alert rules configured.</p>
             </div>
           </div>
         </div>
