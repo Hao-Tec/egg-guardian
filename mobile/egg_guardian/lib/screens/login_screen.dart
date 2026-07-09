@@ -6,6 +6,7 @@ import 'package:egg_guardian/screens/forgot_password_screen.dart';
 import 'package:egg_guardian/services/api_service.dart';
 import 'package:egg_guardian/services/session_service.dart';
 import 'package:egg_guardian/theme.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? sessionExpiredMessage;
@@ -122,6 +123,16 @@ class _LoginScreenState extends State<LoginScreen>
       final user = await api.getCurrentUser();
       await api.setAdminStatus(user.isSuperuser);
       SessionService().startSession();
+      
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await api.updateFcmToken(token);
+        }
+      } catch (e) {
+        debugPrint('Failed to update FCM token during login: $e');
+      }
+
       if (mounted) {
         Navigator.pushReplacementNamed(context, user.isSuperuser ? '/admin' : '/devices');
       }

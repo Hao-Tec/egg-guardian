@@ -52,5 +52,10 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-
+        
+        # Add fcm_token column if it doesn't exist
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(255)"))
+        except Exception:
+            pass

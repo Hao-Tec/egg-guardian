@@ -30,13 +30,7 @@ void main() async {
     sound: true,
   );
   
-  // Print FCM token for debugging/backend integration
-  FirebaseMessaging.instance.getToken().then((token) {
-    debugPrint('FCM Token: $token');
-  }).catchError((e) {
-    debugPrint('Failed to get FCM Token (Firebase not fully configured): $e');
-  });
-
+  // Token logic moved to initState
   await ApiService().init();
   runApp(const EggGuardianApp());
 }
@@ -66,6 +60,15 @@ class _EggGuardianAppState extends State<EggGuardianApp> {
     // Start session if already logged in (auto-login)
     if (ApiService().isLoggedIn) {
       SessionService().startSession();
+      
+      // Update FCM token
+      FirebaseMessaging.instance.getToken().then((token) {
+        if (token != null) {
+          ApiService().updateFcmToken(token);
+        }
+      }).catchError((e) {
+        debugPrint('Failed to get FCM Token: $e');
+      });
     }
     
     // Global alert listener

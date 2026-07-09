@@ -227,6 +227,30 @@ class MQTTService:
                     },
                 })
 
+                # Dispatch FCM push notification
+                from app.models import User
+                from sqlalchemy import or_
+                # Get tokens for device owner AND all superusers
+                stmt = select(User.fcm_token).where(
+                    User.fcm_token.isnot(None),
+                    User.is_active == True,
+                    or_(User.id == device.owner_id, User.is_superuser == True)
+                )
+                tokens_result = await db.execute(stmt)
+                tokens = [t for t in tokens_result.scalars().all() if t]
+                
+                if tokens:
+                    import asyncio
+                    from app.services.fcm import send_multicast_push_notification
+                    asyncio.create_task(
+                        asyncio.to_thread(
+                            send_multicast_push_notification,
+                            tokens=tokens,
+                            title=f"Egg Guardian Alert: {device.name}",
+                            body=message,
+                        )
+                    )
+
 
 # Global MQTT service instance
 mqtt_service = MQTTService()

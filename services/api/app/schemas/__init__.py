@@ -67,6 +67,12 @@ class AdminPasswordResetRequest(BaseModel):
         return v
 
 
+class FCMTokenRequest(BaseModel):
+    """Register or update an FCM push notification token."""
+
+    token: str
+
+
 # ============== User Schemas ==============
 
 

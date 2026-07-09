@@ -301,7 +301,10 @@
           <div class="card" id="live-monitor-card">
             <div class="card-header">
               <h3 class="card-title">Live Monitor</h3>
-              <span id="ws-status" class="status-pill status-syncing">Connecting</span>
+              <div class="header-actions" style="display:flex; align-items:center; gap:10px;">
+                <span id="ws-status" class="status-pill status-syncing">Connecting</span>
+                <button id="btn-clear-chart" class="btn btn-outline" style="padding:4px 8px; font-size:12px;">Clear</button>
+              </div>
             </div>
             <div class="live-temp-display">
               <div id="live-temp-value" class="live-temp-value">—</div>

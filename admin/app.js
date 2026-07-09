@@ -726,15 +726,33 @@ function initChart() {
     const ctx = canvas.getContext('2d');
     chart = new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ data: [], borderColor: '#F59E0B', borderWidth: 2, tension: 0.4, pointRadius: 0 }] },
+        data: { labels: [], datasets: [{ data: [], borderColor: '#F59E0B', borderWidth: 2, tension: 0.4, pointRadius: 2, backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true }] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { x: { display: false }, y: { display: false, min: 33, max: 42 } },
-            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { 
+                x: { display: true, grid: { display: false }, ticks: { maxRotation: 0, font: {size: 10} } }, 
+                y: { display: true, min: 33, max: 42, grid: { color: 'rgba(200,200,200,0.1)' } } 
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: true } },
             animation: false
         }
     });
+
+    // Setup clear button
+    const clearBtn = document.getElementById('btn-clear-chart');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (confirm("Are you sure you want to clear the graph data from your screen?")) {
+                if (chart) {
+                    chart.data.labels = [];
+                    chart.data.datasets[0].data = [];
+                    chart.update();
+                    els.liveTempValue.textContent = '—';
+                }
+            }
+        });
+    }
 }
 
 function setupWebSocket(dbId) {
@@ -754,6 +772,19 @@ function setupWebSocket(dbId) {
         chart.data.labels = [];
         chart.data.datasets[0].data = [];
         chart.update();
+        
+        // Fetch historical data
+        apiCall(`/devices/${dbId}/telemetry?hours=1&limit=50`).then(res => {
+            if (res && res.readings && chart) {
+                const readings = res.readings.reverse(); // oldest first
+                chart.data.labels = readings.map(r => new Date(r.recorded_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                chart.data.datasets[0].data = readings.map(r => r.temp_c);
+                if (readings.length > 0) {
+                    els.liveTempValue.textContent = readings[readings.length-1].temp_c.toFixed(1);
+                }
+                chart.update();
+            }
+        });
     }
     
     els.wsStatus.className = 'status-pill status-syncing';
@@ -776,9 +807,10 @@ function setupWebSocket(dbId) {
                 els.liveTempValue.textContent = tempC.toFixed(1);
                 
                 if (chart) {
-                    chart.data.labels.push('');
+                    const timeStr = new Date(data.data.recorded_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    chart.data.labels.push(timeStr);
                     chart.data.datasets[0].data.push(tempC);
-                    if (chart.data.datasets[0].data.length > 30) {
+                    if (chart.data.datasets[0].data.length > 50) {
                         chart.data.labels.shift();
                         chart.data.datasets[0].data.shift();
                     }

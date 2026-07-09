@@ -84,6 +84,22 @@ class ApiService {
   /// Check if the session should be persisted (Remember Me).
   bool get shouldPersist => _shouldPersist;
 
+  /// Update FCM token on the backend
+  Future<bool> updateFcmToken(String token) async {
+    try {
+      final response = await _request(
+        'POST',
+        '/auth/fcm-token',
+        body: {'token': token},
+        requiresAuth: true,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating FCM token: $e');
+      return false;
+    }
+  }
+
   /// Get authorization headers.
   Map<String, String> get _authHeaders => {
     'Content-Type': 'application/json',

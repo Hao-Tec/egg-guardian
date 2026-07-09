@@ -9,6 +9,7 @@ from app.models import User
 from app.schemas import (
     AdminPasswordResetRequest,
     ForgotPasswordRequest,
+    FCMTokenRequest,
     RefreshTokenRequest,
     ResetPasswordRequest,
     Token,
@@ -189,3 +190,15 @@ async def reset_password(
         )
     await update_user_password(db, user, request.new_password)
     return {"message": "Password has been reset successfully. You can now log in."}
+
+
+@router.post("/fcm-token", status_code=status.HTTP_200_OK)
+async def update_fcm_token(
+    request: FCMTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Register or update the FCM token for the current user."""
+    current_user.fcm_token = request.token
+    await db.commit()
+    return {"message": "FCM token updated successfully."}

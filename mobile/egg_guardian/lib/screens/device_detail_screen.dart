@@ -118,6 +118,37 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen>
     } catch (_) {}
   }
 
+  Future<void> _confirmClearGraph() async {
+    final bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: EgTheme.bgCard,
+        title: Text('Clear Graph?', style: TextStyle(color: EgTheme.textPrimary)),
+        content: Text('Are you sure you want to clear the graph data from your screen?', style: TextStyle(color: EgTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: EgTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: EgTheme.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      setState(() {
+        _chartData.clear();
+        _chartTimes.clear();
+        _currentTemp = null;
+        _minTemp = double.infinity;
+        _maxTemp = double.negativeInfinity;
+      });
+    }
+  }
   Future<void> _connectWebSocket() async {
     await _wsService.connect(widget.device.deviceId);
     if (!mounted) return;
@@ -229,6 +260,10 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen>
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_sweep_rounded, color: EgTheme.textSecondary),
+                onPressed: _confirmClearGraph,
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: EgTheme.textSecondary),
@@ -422,7 +457,25 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen>
                         ),
                         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 24,
+                            interval: (_chartData.length > 4 ? (_chartData.length / 4).ceilToDouble() : 1),
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index < 0 || index >= _chartTimes.length) return const SizedBox.shrink();
+                              final time = _chartTimes[index].toLocal();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  DateFormat('HH:mm').format(time),
+                                  style: EgTheme.body(10, color: EgTheme.textMuted),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                       ),
                       borderData: FlBorderData(show: false),
                       minY: 33,
