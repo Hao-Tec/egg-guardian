@@ -124,11 +124,7 @@ async def list_device_alerts(
             detail="Device not found",
         )
         
-    if not current_user.is_superuser and device.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this device's alerts",
-        )
+    # No access check to allow all users to view alerts for any device
 
     result = await db.execute(
         select(Alert)

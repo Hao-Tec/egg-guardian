@@ -15,7 +15,7 @@ from app.schemas import (
     DeviceResponse,
     DeviceUpdate,
 )
-from app.services.deps import get_current_user
+from app.services.deps import get_current_user, get_current_superuser
 
 router = APIRouter(prefix="/api/v1/devices", tags=["Devices"])
 
@@ -72,9 +72,9 @@ async def list_devices(
 async def create_device(
     device_data: DeviceCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_superuser),
 ):
-    """Register a new device."""
+    """Register a new device (superuser only)."""
     existing = await db.execute(
         select(Device).where(Device.device_id == device_data.device_id)
     )
@@ -216,7 +216,7 @@ async def list_device_rules(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
-    check_device_access(device, current_user)
+    # Allow all authenticated users to read rules
 
     result = await db.execute(select(AlertRule).where(AlertRule.device_id == device_id))
     return result.scalars().all()

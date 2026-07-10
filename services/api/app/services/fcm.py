@@ -27,6 +27,8 @@ def init_fcm():
     cert_env = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
     if cert_env:
         try:
+            # Handle potential double-escaped newlines from environment variables
+            cert_env = cert_env.replace('\\n', '\n')
             cert_dict = json.loads(cert_env)
             cred = credentials.Certificate(cert_dict)
             firebase_admin.initialize_app(cred)
