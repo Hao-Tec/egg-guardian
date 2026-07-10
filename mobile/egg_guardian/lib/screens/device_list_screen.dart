@@ -6,6 +6,7 @@ import 'package:egg_guardian/config.dart';
 import 'package:egg_guardian/models.dart';
 import 'package:egg_guardian/services/api_service.dart';
 import 'package:egg_guardian/services/websocket_service.dart';
+import 'package:egg_guardian/screens/alerts_screen.dart';
 import 'package:egg_guardian/theme.dart';
 
 class DeviceListScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   String? _error;
   Timer? _refreshTimer;
   StreamSubscription? _wsSub;
+  int _selectedTab = 0; // 0 = Devices, 1 = Alerts
 
   @override
   void initState() {
@@ -100,12 +102,46 @@ class _DeviceListScreenState extends State<DeviceListScreen>
 
     return Scaffold(
       backgroundColor: EgTheme.bgBase,
-      body: Column(
+      body: IndexedStack(
+        index: _selectedTab,
         children: [
-          _buildHeader(),
-          if (ApiService().isOfflineMode) _buildOfflineBanner(),
-          Expanded(child: _buildBody()),
+          // Tab 0: Devices
+          Column(
+            children: [
+              _buildHeader(),
+              if (ApiService().isOfflineMode) _buildOfflineBanner(),
+              Expanded(child: _buildBody()),
+            ],
+          ),
+          // Tab 1: Alerts
+          const AlertsScreen(),
         ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1627),
+          border: Border(top: BorderSide(color: EgTheme.border)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedTab,
+          onTap: (i) => setState(() => _selectedTab = i),
+          backgroundColor: Colors.transparent,
+          selectedItemColor: EgTheme.accent,
+          unselectedItemColor: EgTheme.textMuted,
+          elevation: 0,
+          selectedLabelStyle: EgTheme.body(11, weight: FontWeight.w600),
+          unselectedLabelStyle: EgTheme.body(11),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.device_thermostat_rounded),
+              label: 'Devices',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_rounded),
+              label: 'Alerts',
+            ),
+          ],
+        ),
       ),
     );
   }

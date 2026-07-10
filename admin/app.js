@@ -369,9 +369,15 @@ async function fetchUsers() {
 
 async function fetchAlerts() {
     try {
-        const res = await fetch(`${API_BASE}/alerts?limit=100`, { headers: { 'Authorization': `Bearer ${authToken}` } });
-        if (res.ok) triggeredAlerts = await res.json();
-    } catch (e) {}
+        const res = await fetch(`${API_BASE}/alerts?limit=200`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.ok) {
+            triggeredAlerts = await res.json();
+        } else {
+            console.error('fetchAlerts failed:', res.status, await res.text());
+        }
+    } catch (e) {
+        console.error('fetchAlerts error:', e);
+    }
 }
 
 function updateUI() {
@@ -442,7 +448,7 @@ function renderDeviceList(container, list, compact) {
             <div class="device-info">
                 <div class="device-name">${escapeHtml(d.name)}</div>
                 <div class="device-id">${escapeHtml(d.device_id)}</div>
-                ${!compact ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Alerts: ${d.temp_min.toFixed(1)}°C - ${d.temp_max.toFixed(1)}°C</div>` : ''}
+                ${!compact ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Thresholds: ${d.temp_min != null ? d.temp_min.toFixed(1) + '°C - ' + d.temp_max.toFixed(1) + '°C' : 'Not set'}</div>` : ''}
             </div>
             <span class="status-pill ${d.is_active ? 'status-connected' : ''}">${d.is_active ? 'Active' : 'Offline'}</span>
             ${!compact ? `

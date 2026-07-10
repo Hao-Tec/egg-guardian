@@ -129,6 +129,38 @@ class AlertRule {
   }
 }
 
+class AlertModel {
+  final int id;
+  final int deviceId;
+  final double tempC;
+  final String alertType;
+  final String message;
+  final bool isAcknowledged;
+  final DateTime triggeredAt;
+
+  AlertModel({
+    required this.id,
+    required this.deviceId,
+    required this.tempC,
+    required this.alertType,
+    required this.message,
+    required this.isAcknowledged,
+    required this.triggeredAt,
+  });
+
+  factory AlertModel.fromJson(Map<String, dynamic> json) {
+    return AlertModel(
+      id: json['id'],
+      deviceId: json['device_id'],
+      tempC: (json['temp_c'] as num).toDouble(),
+      alertType: json['alert_type'],
+      message: json['message'],
+      isAcknowledged: json['is_acknowledged'] ?? false,
+      triggeredAt: DateTime.parse(json['triggered_at']),
+    );
+  }
+}
+
 class AuthTokens {
   final String accessToken;
   final String refreshToken;
