@@ -34,7 +34,7 @@ async def list_alerts(
     query = query.order_by(Alert.triggered_at.desc()).limit(limit)
 
     if unacknowledged_only:
-        query = query.where(Alert.is_acknowledged == False)
+        query = query.where(Alert.is_acknowledged.is_(False))
 
     result = await db.execute(query)
     alerts = result.scalars().all()
@@ -103,7 +103,7 @@ async def acknowledge_all_alerts(
     query = (
         select(Alert)
         .join(Device, Alert.device_id == Device.id)
-        .where(Alert.is_acknowledged == False)
+        .where(Alert.is_acknowledged.is_(False))
     )
     # No access check to allow all users to acknowledge alerts
 
@@ -156,7 +156,7 @@ async def clear_acknowledged_alerts(
     query = (
         select(Alert)
         .join(Device, Alert.device_id == Device.id)
-        .where(Alert.is_acknowledged == True)
+        .where(Alert.is_acknowledged.is_(True))
     )
     if not current_user.is_superuser:
         query = query.where(Device.owner_id == current_user.id)

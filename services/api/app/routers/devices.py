@@ -1,7 +1,5 @@
 """Device management router."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +33,6 @@ async def list_devices(
     current_user: User = Depends(get_current_user),
 ):
     """List all devices with their latest telemetry (authenticated)."""
-    from sqlalchemy import func
     from app.models import Telemetry, AlertRule
 
     query = select(Device).order_by(Device.created_at.desc())
@@ -58,7 +55,7 @@ async def list_devices(
         # Fetch active alert rule for threshold data
         rule_result = await db.execute(
             select(AlertRule)
-            .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+            .where(AlertRule.device_id == device.id, AlertRule.is_active.is_(True))
             .limit(1)
         )
         rule = rule_result.scalar_one_or_none()
@@ -123,7 +120,7 @@ async def get_device(
 
     rule_result = await db.execute(
         select(AlertRule)
-        .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+        .where(AlertRule.device_id == device.id, AlertRule.is_active.is_(True))
         .limit(1)
     )
     rule = rule_result.scalar_one_or_none()

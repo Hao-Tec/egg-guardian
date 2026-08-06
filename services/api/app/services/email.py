@@ -5,7 +5,6 @@ import asyncio
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import partial
-from typing import Optional
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
