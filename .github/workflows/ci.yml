@@ -85,7 +85,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          flutter-version: 'latest'
           channel: 'stable'
 
       - name: Get dependencies
@@ -109,7 +109,12 @@ jobs:
       - name: Build API image
         run: docker build -t egg-api services/api
 
-      - name: Test docker-compose config (compose plugin)
-        uses: docker/compose-action@v2
-        with:
-          compose-command: config
+      - name: Test docker-compose config (if available)
+        run: |
+          if command -v docker-compose >/dev/null 2>&1; then
+            docker-compose config
+          elif docker compose version >/dev/null 2>&1; then
+            docker compose config
+          else
+            echo "docker-compose not available; skipping compose config check"
+          fi
