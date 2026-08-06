@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(
         default="postgresql+asyncpg://egg_guardian:egg_guardian_secret@localhost:5432/egg_guardian",
-        alias="DATABASE_URL"
+        alias="DATABASE_URL",
     )
 
     # MQTT - explicit aliases for Docker compatibility
@@ -20,9 +20,13 @@ class Settings(BaseSettings):
     mqtt_port: int = Field(default=1883, alias="MQTT_PORT")
 
     # JWT
-    jwt_secret_key: str = Field(default="change-me-in-production", alias="JWT_SECRET_KEY")
+    jwt_secret_key: str = Field(
+        default="change-me-in-production", alias="JWT_SECRET_KEY"
+    )
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    access_token_expire_minutes: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    access_token_expire_minutes: int = Field(
+        default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
     refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
 
     # API
@@ -38,7 +42,9 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
     google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
     google_refresh_token: str = Field(default="", alias="GOOGLE_REFRESH_TOKEN")
-    google_sender_email: str = Field(default="noreply@egg-guardian.com", alias="GOOGLE_SENDER_EMAIL")
+    google_sender_email: str = Field(
+        default="noreply@egg-guardian.com", alias="GOOGLE_SENDER_EMAIL"
+    )
 
     class Config:
         env_file = ".env"
@@ -50,4 +56,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
-

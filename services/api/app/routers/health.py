@@ -1,6 +1,7 @@
 """Health check and root endpoints."""
 
 from pathlib import Path
+from datetime import datetime
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
 
@@ -28,7 +29,7 @@ async def favicon():
 async def health_check():
     """
     Health check endpoint.
-    
-    Returns 200 OK if the service is healthy.
+
+    Returns 200 OK if the service is healthy. Includes a timestamp for monitoring systems and tests.
     """
-    return {"status": "healthy"}
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}

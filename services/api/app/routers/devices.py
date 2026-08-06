@@ -111,8 +111,9 @@ async def get_device(
             detail="Device not found",
         )
     # Removed check_device_access to allow all users to view the device
-    
+
     from app.models import AlertRule
+
     rule_result = await db.execute(
         select(AlertRule)
         .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
@@ -121,7 +122,7 @@ async def get_device(
     rule = rule_result.scalar_one_or_none()
     device.temp_min = rule.temp_min if rule else 35.0
     device.temp_max = rule.temp_max if rule else 39.0
-    
+
     return device
 
 
@@ -181,7 +182,9 @@ async def list_all_rules(
     current_user: User = Depends(get_current_user),
 ):
     """List all alert rules (bulk fetch)."""
-    query = select(AlertRule, Device.name).join(Device, AlertRule.device_id == Device.id)
+    query = select(AlertRule, Device.name).join(
+        Device, AlertRule.device_id == Device.id
+    )
     if not current_user.is_superuser:
         query = query.where(Device.owner_id == current_user.id)
     query = query.order_by(Device.name, AlertRule.id)

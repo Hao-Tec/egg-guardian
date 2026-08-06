@@ -10,7 +10,6 @@ from app.models import Alert, Device, User
 from app.schemas import AlertResponse
 from app.services.deps import get_current_user
 
-
 router = APIRouter(prefix="/api/v1/alerts", tags=["Alerts"])
 
 
@@ -29,11 +28,11 @@ async def list_alerts(
 ):
     """List all alerts (authenticated)."""
     query = select(Alert).join(Device, Alert.device_id == Device.id)
-    
+
     # No access check to allow all users to view alerts
-        
+
     query = query.order_by(Alert.triggered_at.desc()).limit(limit)
-    
+
     if unacknowledged_only:
         query = query.where(Alert.is_acknowledged == False)
 
@@ -49,9 +48,13 @@ async def get_alert(
     current_user: User = Depends(get_current_user),
 ):
     """Get a specific alert by ID."""
-    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
+    query = (
+        select(Alert)
+        .join(Device, Alert.device_id == Device.id)
+        .where(Alert.id == alert_id)
+    )
     # No access check to allow all users to view alerts
-        
+
     result = await db.execute(query)
     alert = result.scalar_one_or_none()
     if not alert:
@@ -69,9 +72,13 @@ async def acknowledge_alert(
     current_user: User = Depends(get_current_user),
 ):
     """Acknowledge an alert."""
-    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.id == alert_id)
+    query = (
+        select(Alert)
+        .join(Device, Alert.device_id == Device.id)
+        .where(Alert.id == alert_id)
+    )
     # No access check to allow all users to acknowledge alerts
-        
+
     result = await db.execute(query)
     alert = result.scalar_one_or_none()
     if not alert:
@@ -93,9 +100,13 @@ async def acknowledge_all_alerts(
     current_user: User = Depends(get_current_user),
 ):
     """Acknowledge all unacknowledged alerts for the user's devices."""
-    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.is_acknowledged == False)
+    query = (
+        select(Alert)
+        .join(Device, Alert.device_id == Device.id)
+        .where(Alert.is_acknowledged == False)
+    )
     # No access check to allow all users to acknowledge alerts
-        
+
     result = await db.execute(query)
     alerts = result.scalars().all()
 
@@ -123,7 +134,7 @@ async def list_device_alerts(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not found",
         )
-        
+
     # No access check to allow all users to view alerts for any device
 
     result = await db.execute(
@@ -142,10 +153,14 @@ async def clear_acknowledged_alerts(
     current_user: User = Depends(get_current_user),
 ):
     """Delete all acknowledged alerts (authenticated & authorized)."""
-    query = select(Alert).join(Device, Alert.device_id == Device.id).where(Alert.is_acknowledged == True)
+    query = (
+        select(Alert)
+        .join(Device, Alert.device_id == Device.id)
+        .where(Alert.is_acknowledged == True)
+    )
     if not current_user.is_superuser:
         query = query.where(Device.owner_id == current_user.id)
-        
+
     result = await db.execute(query)
     alerts = result.scalars().all()
 
@@ -166,7 +181,7 @@ async def delete_all_alerts(
     query = select(Alert).join(Device, Alert.device_id == Device.id)
     if not current_user.is_superuser:
         query = query.where(Device.owner_id == current_user.id)
-        
+
     result = await db.execute(query)
     alerts = result.scalars().all()
 

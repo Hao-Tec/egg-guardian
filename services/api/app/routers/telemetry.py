@@ -4,7 +4,15 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +22,7 @@ from app.schemas import TelemetryHistory, TelemetryResponse
 from app.services.deps import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["Telemetry"])
+
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -104,18 +113,20 @@ async def websocket_endpoint(
 ):
     """
     WebSocket endpoint for real-time telemetry updates.
-    
+
     Connect to receive telemetry and alert updates for a specific device.
     Use device_id="all" to receive updates for all devices.
     """
     await manager.connect(websocket, device_id)
     try:
         # Send initial connection success message
-        await websocket.send_json({
-            "type": "connected",
-            "device_id": device_id,
-            "message": f"Connected to telemetry stream for {device_id}",
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "device_id": device_id,
+                "message": f"Connected to telemetry stream for {device_id}",
+            }
+        )
 
         # Keep connection alive and listen for messages
         while True:
@@ -123,17 +134,17 @@ async def websocket_endpoint(
                 # Wait for client messages (ping/pong or commands)
                 data = await asyncio.wait_for(
                     websocket.receive_json(),
-                    timeout=30.0  # 30 second timeout for keepalive
+                    timeout=30.0,  # 30 second timeout for keepalive
                 )
-                
+
                 # Handle ping
                 if data.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
-                    
+
             except asyncio.TimeoutError:
                 # Send keepalive ping
                 await websocket.send_json({"type": "ping"})
-                
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, device_id)
     except Exception:
