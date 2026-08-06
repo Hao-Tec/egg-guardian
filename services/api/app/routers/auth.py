@@ -35,13 +35,16 @@ from app.services.email import send_new_registration_email, send_password_reset_
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ):
     """Register a new user account. The very first user is auto-approved as Superadmin.
-    All subsequent users are set to Pending (is_active=False) until approved by an admin."""
+    All subsequent users are set to Pending (is_active=False) until approved by an admin.
+    """
     existing = await get_user_by_email(db, user_data.email)
     if existing:
         raise HTTPException(
@@ -50,6 +53,7 @@ async def register(
         )
 
     from sqlalchemy import select
+
     result = await db.execute(select(User).limit(1))
     is_first_user = result.scalar_one_or_none() is None
 

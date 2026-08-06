@@ -55,7 +55,9 @@ class MQTTService:
                 ) as client:
                     # Subscribe to all device telemetry topics
                     await client.subscribe("egg/+/telemetry")
-                    logger.info(f"Subscribed to egg/+/telemetry on {settings.mqtt_broker}:{settings.mqtt_port}")
+                    logger.info(
+                        f"Subscribed to egg/+/telemetry on {settings.mqtt_broker}:{settings.mqtt_port}"
+                    )
 
                     async for message in client.messages:
                         if not self.running:
@@ -79,7 +81,11 @@ class MQTTService:
         try:
             # Parse topic to extract device_id
             topic_parts = message.topic.value.split("/")
-            if len(topic_parts) != 3 or topic_parts[0] != "egg" or topic_parts[2] != "telemetry":
+            if (
+                len(topic_parts) != 3
+                or topic_parts[0] != "egg"
+                or topic_parts[2] != "telemetry"
+            ):
                 logger.warning(f"Invalid topic format: {message.topic}")
                 return
 
@@ -89,7 +95,7 @@ class MQTTService:
             payload = json.loads(message.payload.decode())
             device_id = payload.get("device_id", mqtt_device_id)
             temp_c = float(payload["temp_c"])
-            
+
             # Parse timestamp
             ts_str = payload.get("ts")
             if ts_str:
@@ -120,9 +126,7 @@ class MQTTService:
     ):
         """Persist telemetry to database and check alerts."""
         # Get or create device
-        result = await db.execute(
-            select(Device).where(Device.device_id == device_id)
-        )
+        result = await db.execute(select(Device).where(Device.device_id == device_id))
         device = result.scalar_one_or_none()
 
         if not device:
@@ -137,10 +141,7 @@ class MQTTService:
 
             # Auto-create default alert rule so alerts can be triggered
             rule = AlertRule(
-                device_id=device.id,
-                temp_min=36.0,
-                temp_max=40.0,
-                is_active=True
+                device_id=device.id, temp_min=36.0, temp_max=40.0, is_active=True
             )
             db.add(rule)
             await db.flush()
@@ -157,23 +158,29 @@ class MQTTService:
 
         # Broadcast to WebSocket clients
         ws_manager = get_connection_manager()
-        await ws_manager.broadcast_to_device(device_id, {
-            "type": "telemetry",
-            "device_id": device_id,
-            "data": {
-                "temp_c": temp_c,
-                "recorded_at": recorded_at.isoformat(),
+        await ws_manager.broadcast_to_device(
+            device_id,
+            {
+                "type": "telemetry",
+                "device_id": device_id,
+                "data": {
+                    "temp_c": temp_c,
+                    "recorded_at": recorded_at.isoformat(),
+                },
             },
-        })
+        )
         # Also broadcast to "all" subscribers
-        await ws_manager.broadcast_to_device("all", {
-            "type": "telemetry",
-            "device_id": device_id,
-            "data": {
-                "temp_c": temp_c,
-                "recorded_at": recorded_at.isoformat(),
+        await ws_manager.broadcast_to_device(
+            "all",
+            {
+                "type": "telemetry",
+                "device_id": device_id,
+                "data": {
+                    "temp_c": temp_c,
+                    "recorded_at": recorded_at.isoformat(),
+                },
             },
-        })
+        )
 
         # Check alert rules
         await self._check_alerts(db, device, temp_c, ws_manager)
@@ -219,39 +226,46 @@ class MQTTService:
                 logger.warning(f"Alert triggered for {device.device_id}: {message}")
 
                 # Broadcast alert
-                await ws_manager.broadcast_to_device(device.device_id, {
-                    "type": "alert",
-                    "device_id": device.device_id,
-                    "data": {
-                        "alert_type": alert_type,
-                        "temp_c": temp_c,
-                        "message": message,
+                await ws_manager.broadcast_to_device(
+                    device.device_id,
+                    {
+                        "type": "alert",
+                        "device_id": device.device_id,
+                        "data": {
+                            "alert_type": alert_type,
+                            "temp_c": temp_c,
+                            "message": message,
+                        },
                     },
-                })
-                await ws_manager.broadcast_to_device("all", {
-                    "type": "alert",
-                    "device_id": device.device_id,
-                    "data": {
-                        "alert_type": alert_type,
-                        "temp_c": temp_c,
-                        "message": message,
+                )
+                await ws_manager.broadcast_to_device(
+                    "all",
+                    {
+                        "type": "alert",
+                        "device_id": device.device_id,
+                        "data": {
+                            "alert_type": alert_type,
+                            "temp_c": temp_c,
+                            "message": message,
+                        },
                     },
-                })
+                )
 
                 # Dispatch FCM push notification
                 from app.models import User
                 from sqlalchemy import or_
+
                 # Get tokens for ALL active users (workers need to monitor auto-registered devices too)
                 stmt = select(User.fcm_token).where(
-                    User.fcm_token.isnot(None),
-                    User.is_active == True
+                    User.fcm_token.isnot(None), User.is_active == True
                 )
                 tokens_result = await db.execute(stmt)
                 tokens = [t for t in tokens_result.scalars().all() if t]
-                
+
                 if tokens:
                     import asyncio
                     from app.services.fcm import send_multicast_push_notification
+
                     asyncio.create_task(
                         asyncio.to_thread(
                             send_multicast_push_notification,
