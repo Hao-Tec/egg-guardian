@@ -196,7 +196,7 @@ class MQTTService:
         result = await db.execute(
             select(AlertRule)
             .where(AlertRule.device_id == device.id)
-           .where(AlertRule.is_active.is_(True))
+            .where(AlertRule.is_active.is_(True))
         )
         rules = result.scalars().all()
 
