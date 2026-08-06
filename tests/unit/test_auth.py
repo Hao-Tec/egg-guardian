@@ -13,6 +13,7 @@ async def test_register_user(client: AsyncClient):
             "email": "test@example.com",
             "password": "testpass123",
             "full_name": "Test User",
+            "job_role": "Tester",
         },
     )
     assert response.status_code == 201
@@ -41,7 +42,7 @@ async def test_register_duplicate_email(client: AsyncClient):
         "/api/v1/auth/register",
         json={
             "email": "dupe@example.com",
-            "password": "otherpass",
+            "password": "otherpass1",
             "full_name": "Dupe User",
             "job_role": "Tester",
         },

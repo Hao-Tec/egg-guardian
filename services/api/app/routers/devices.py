@@ -92,6 +92,13 @@ async def create_device(
     )
     db.add(device)
     await db.flush()
+
+    # Persist so subsequent requests (tests and other sessions) can see the device
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
     await db.refresh(device)
     return device
 
