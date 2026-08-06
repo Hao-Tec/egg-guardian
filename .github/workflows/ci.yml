@@ -65,7 +65,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install linters
-        run: pip install black ruff
+        working-directory: services/api
+        run: pip install -r requirements.txt
 
       - name: Check formatting
         working-directory: services/api
@@ -85,7 +86,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          flutter-version: '3.10.5'
           channel: 'stable'
 
       - name: Get dependencies
@@ -109,7 +110,12 @@ jobs:
       - name: Build API image
         run: docker build -t egg-api services/api
 
-      - name: Test docker-compose config (compose plugin)
-        uses: docker/compose-action@v2
-        with:
-          compose-command: config
+      - name: Test docker-compose config (if available)
+        run: |
+          if command -v docker-compose >/dev/null 2>&1; then
+            docker-compose config
+          elif docker compose version >/dev/null 2>&1; then
+            docker compose config
+          else
+            echo "docker-compose not available; skipping compose config check"
+          fi
