@@ -65,7 +65,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install linters
-        run: pip install black ruff
+        working-directory: services/api
+        run: pip install -r requirements.txt
 
       - name: Check formatting
         working-directory: services/api
@@ -85,7 +86,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'latest'
+          flutter-version: '3.10.5'
           channel: 'stable'
 
       - name: Get dependencies
