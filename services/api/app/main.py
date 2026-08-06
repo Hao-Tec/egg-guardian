@@ -26,8 +26,22 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown."""
     # Startup
     logger.info("Starting Egg Guardian API...")
-    await init_db()
-    logger.info("Database initialized")
+    # Wait for DB to be reachable before trying to initialize it. This helps
+    # when the managed database is cold-starting or was recently recreated.
+    try:
+        from app.database import wait_for_db
+
+        await wait_for_db()
+    except Exception as e:  # pragma: no cover - environment-specific
+        logger.error(f"Database is not reachable: {e}")
+        # Allow process to continue so Render can show healthy logs;
+        # init_db will still fail later if DB is missing when called.
+
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception as e:  # pragma: no cover - environment-specific
+        logger.error(f"Failed to initialize database: {e}")
 
     # Start MQTT service
     mqtt_service = get_mqtt_service()
