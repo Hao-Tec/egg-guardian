@@ -5,7 +5,6 @@ import asyncio
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import partial
-from typing import Optional
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -23,7 +22,7 @@ def _send_email_sync(
     """Synchronous email sending (run in a thread to avoid blocking)."""
     if not to_emails:
         return
-        
+
     if not settings.google_refresh_token or not settings.google_client_id:
         print("[EmailService] Google API credentials missing. Check .env")
         return
@@ -36,17 +35,17 @@ def _send_email_sync(
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         encoded_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-        create_message = {'raw': encoded_message}
+        create_message = {"raw": encoded_message}
 
         creds = Credentials(
             token=None,
             refresh_token=settings.google_refresh_token,
             client_id=settings.google_client_id,
             client_secret=settings.google_client_secret,
-            token_uri="https://oauth2.googleapis.com/token"
+            token_uri="https://oauth2.googleapis.com/token",
         )
 
-        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+        service = build("gmail", "v1", credentials=creds, cache_discovery=False)
         service.users().messages().send(userId="me", body=create_message).execute()
         print(f"[EmailService] Successfully sent email via Gmail API to {to_emails}")
     except Exception as e:
@@ -105,8 +104,7 @@ async def send_new_registration_email(
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
-        None,
-        partial(_send_email_sync, admin_emails, subject, html_body)
+        None, partial(_send_email_sync, admin_emails, subject, html_body)
     )
 
 
@@ -150,8 +148,7 @@ async def send_account_approved_email(
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
-        None,
-        partial(_send_email_sync, [user_email], subject, html_body)
+        None, partial(_send_email_sync, [user_email], subject, html_body)
     )
 
 
@@ -205,10 +202,9 @@ async def send_password_reset_email(
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
-        None,
-        partial(_send_email_sync, [user_email], subject, html_body)
+        None, partial(_send_email_sync, [user_email], subject, html_body)
     )
-    
+
     # Also print to logs for testing/dev without SMTP config
     print(f"\n{'='*50}")
     print(f" PASSWORD RESET TOKEN FOR: {user_email}")

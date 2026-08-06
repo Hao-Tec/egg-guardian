@@ -1,7 +1,5 @@
 """Device management router."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +33,6 @@ async def list_devices(
     current_user: User = Depends(get_current_user),
 ):
     """List all devices with their latest telemetry (authenticated)."""
-    from sqlalchemy import func
     from app.models import Telemetry, AlertRule
 
     query = select(Device).order_by(Device.created_at.desc())
@@ -58,7 +55,7 @@ async def list_devices(
         # Fetch active alert rule for threshold data
         rule_result = await db.execute(
             select(AlertRule)
-            .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+            .where(AlertRule.device_id == device.id, AlertRule.is_active.is_(True))
             .limit(1)
         )
         rule = rule_result.scalar_one_or_none()
@@ -92,6 +89,13 @@ async def create_device(
     )
     db.add(device)
     await db.flush()
+
+    # Persist so subsequent requests (tests and other sessions) can see the device
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
     await db.refresh(device)
     return device
 
@@ -111,17 +115,18 @@ async def get_device(
             detail="Device not found",
         )
     # Removed check_device_access to allow all users to view the device
-    
+
     from app.models import AlertRule
+
     rule_result = await db.execute(
         select(AlertRule)
-        .where(AlertRule.device_id == device.id, AlertRule.is_active == True)
+        .where(AlertRule.device_id == device.id, AlertRule.is_active.is_(True))
         .limit(1)
     )
     rule = rule_result.scalar_one_or_none()
     device.temp_min = rule.temp_min if rule else 35.0
     device.temp_max = rule.temp_max if rule else 39.0
-    
+
     return device
 
 
@@ -181,7 +186,9 @@ async def list_all_rules(
     current_user: User = Depends(get_current_user),
 ):
     """List all alert rules (bulk fetch)."""
-    query = select(AlertRule, Device.name).join(Device, AlertRule.device_id == Device.id)
+    query = select(AlertRule, Device.name).join(
+        Device, AlertRule.device_id == Device.id
+    )
     if not current_user.is_superuser:
         query = query.where(Device.owner_id == current_user.id)
     query = query.order_by(Device.name, AlertRule.id)

@@ -34,7 +34,9 @@ def create_access_token(user: User) -> str:
     )
     pwd_claim = user.hashed_password[-10:] if user.hashed_password else "none"
     to_encode = {"sub": str(user.id), "exp": expire, "type": "access", "pwd": pwd_claim}
-    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def create_refresh_token(user: User) -> str:
@@ -43,8 +45,15 @@ def create_refresh_token(user: User) -> str:
         days=settings.refresh_token_expire_days
     )
     pwd_claim = user.hashed_password[-10:] if user.hashed_password else "none"
-    to_encode = {"sub": str(user.id), "exp": expire, "type": "refresh", "pwd": pwd_claim}
-    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    to_encode = {
+        "sub": str(user.id),
+        "exp": expire,
+        "type": "refresh",
+        "pwd": pwd_claim,
+    }
+    return jwt.encode(
+        to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
@@ -64,7 +73,9 @@ def create_reset_token(user_id: int) -> str:
     """Create a short-lived (15 min) JWT for password reset."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode = {"sub": str(user_id), "exp": expire, "type": "reset"}
-    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 async def update_user_password(db: AsyncSession, user: User, new_password: str) -> None:
@@ -87,8 +98,13 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
 
 
 async def create_user(
-    db: AsyncSession, email: str, password: str, full_name: Optional[str] = None,
-    job_role: Optional[str] = None, is_superuser: bool = False, is_active: bool = False
+    db: AsyncSession,
+    email: str,
+    password: str,
+    full_name: Optional[str] = None,
+    job_role: Optional[str] = None,
+    is_superuser: bool = False,
+    is_active: bool = False,
 ) -> User:
     """Create a new user."""
     hashed_password = get_password_hash(password)
@@ -108,7 +124,7 @@ async def create_user(
 
 async def get_all_admins(db: AsyncSession) -> list[User]:
     """Fetch all superuser admins from the database."""
-    result = await db.execute(select(User).where(User.is_superuser == True))
+    result = await db.execute(select(User).where(User.is_superuser.is_(True)))
     return result.scalars().all()
 
 

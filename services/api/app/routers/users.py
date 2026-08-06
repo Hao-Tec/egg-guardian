@@ -12,7 +12,6 @@ from app.services.auth import update_user_password
 from app.services.deps import get_current_superuser
 from app.services.email import send_account_approved_email
 
-
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
 
@@ -110,7 +109,7 @@ async def delete_user(
 
     # Protect last admin
     if user.is_superuser:
-        admin_count = await db.execute(select(User).where(User.is_superuser == True))
+        admin_count = await db.execute(select(User).where(User.is_superuser.is_(True)))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -151,7 +150,7 @@ async def toggle_admin_status(
 
     # Protect last admin from being demoted
     if user.is_superuser:
-        admin_count = await db.execute(select(User).where(User.is_superuser == True))
+        admin_count = await db.execute(select(User).where(User.is_superuser.is_(True)))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -180,13 +179,13 @@ async def admin_reset_password(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-        
+
     # Prevent resetting root owner password unless it's the root owner themselves
     if user.id == 1 and admin_user.id != 1:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the root owner can reset their own password via admin panel.",
         )
-        
+
     await update_user_password(db, user, body.new_password)
     return user

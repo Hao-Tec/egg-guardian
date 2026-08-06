@@ -13,6 +13,7 @@ async def test_register_user(client: AsyncClient):
             "email": "test@example.com",
             "password": "testpass123",
             "full_name": "Test User",
+            "job_role": "Tester",
         },
     )
     assert response.status_code == 201
@@ -28,13 +29,23 @@ async def test_register_duplicate_email(client: AsyncClient):
     # Register first user
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "dupe@example.com", "password": "testpass123"},
+        json={
+            "email": "dupe@example.com",
+            "password": "testpass123",
+            "full_name": "Dupe User",
+            "job_role": "Tester",
+        },
     )
 
     # Try to register again with same email
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": "dupe@example.com", "password": "otherpass"},
+        json={
+            "email": "dupe@example.com",
+            "password": "otherpass1",
+            "full_name": "Dupe User",
+            "job_role": "Tester",
+        },
     )
     assert response.status_code == 400
     assert "already registered" in response.json()["detail"]
@@ -46,7 +57,12 @@ async def test_login_success(client: AsyncClient):
     # Register user
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "login@example.com", "password": "testpass123"},
+        json={
+            "email": "login@example.com",
+            "password": "testpass123",
+            "full_name": "Login User",
+            "job_role": "Tester",
+        },
     )
 
     # Login
@@ -67,7 +83,12 @@ async def test_login_wrong_password(client: AsyncClient):
     # Register user
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "wrongpass@example.com", "password": "testpass123"},
+        json={
+            "email": "wrongpass@example.com",
+            "password": "testpass123",
+            "full_name": "Wrong Pass User",
+            "job_role": "Tester",
+        },
     )
 
     # Try to login with wrong password
@@ -84,7 +105,12 @@ async def test_refresh_token(client: AsyncClient):
     # Register and login
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "refresh@example.com", "password": "testpass123"},
+        json={
+            "email": "refresh@example.com",
+            "password": "testpass123",
+            "full_name": "Refresh User",
+            "job_role": "Tester",
+        },
     )
     login_response = await client.post(
         "/api/v1/auth/login",

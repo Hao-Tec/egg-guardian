@@ -56,7 +56,16 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client."""
+    from app.services.deps import get_current_user, get_current_superuser
+    from types import SimpleNamespace
+
+    async def _fake_current_user():
+        # Lightweight fake user used by tests to bypass authentication where needed
+        return SimpleNamespace(id=1, email="test@example.com", is_active=True, is_superuser=True, hashed_password="x"*60)
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = _fake_current_user
+    app.dependency_overrides[get_current_superuser] = _fake_current_user
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
