@@ -104,7 +104,7 @@ def main():
     client.on_connect = on_connect
     client.on_publish = on_publish
     
-    print(f"Egg Guardian Device Simulator")
+    print("Egg Guardian Device Simulator")
     print(f"   Devices: {args.count}")
     print(f"   Rate: {args.rate}/s per device")
     print(f"   Duration: {args.duration}s")
@@ -133,7 +133,7 @@ def main():
         client.disconnect()
         
         print()
-        print(f"Simulation complete!")
+        print("Simulation complete!")
         print(f"   Total messages published: {userdata['published']}")
         
     except ConnectionRefusedError:

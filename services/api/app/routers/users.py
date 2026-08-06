@@ -109,7 +109,7 @@ async def delete_user(
 
     # Protect last admin
     if user.is_superuser:
-        admin_count = await db.execute(select(User).where(User.is_superuser == True))
+        admin_count = await db.execute(select(User).where(User.is_superuser.is_(True)))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -150,7 +150,7 @@ async def toggle_admin_status(
 
     # Protect last admin from being demoted
     if user.is_superuser:
-        admin_count = await db.execute(select(User).where(User.is_superuser == True))
+        admin_count = await db.execute(select(User).where(User.is_superuser.is_(True)))
         if len(admin_count.scalars().all()) <= 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,6 +1,5 @@
 """Database models for Egg Guardian."""
 
-import uuid
 from datetime import datetime
 from typing import Optional
 

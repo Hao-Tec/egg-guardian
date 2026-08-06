@@ -196,7 +196,7 @@ class MQTTService:
         result = await db.execute(
             select(AlertRule)
             .where(AlertRule.device_id == device.id)
-            .where(AlertRule.is_active == True)
+           .where(AlertRule.is_active.is_(True))
         )
         rules = result.scalars().all()
 
@@ -253,11 +253,10 @@ class MQTTService:
 
                 # Dispatch FCM push notification
                 from app.models import User
-                from sqlalchemy import or_
 
                 # Get tokens for ALL active users (workers need to monitor auto-registered devices too)
                 stmt = select(User.fcm_token).where(
-                    User.fcm_token.isnot(None), User.is_active == True
+                    User.fcm_token.isnot(None), User.is_active.is_(True)
                 )
                 tokens_result = await db.execute(stmt)
                 tokens = [t for t in tokens_result.scalars().all() if t]

@@ -124,7 +124,7 @@ async def create_user(
 
 async def get_all_admins(db: AsyncSession) -> list[User]:
     """Fetch all superuser admins from the database."""
-    result = await db.execute(select(User).where(User.is_superuser == True))
+    result = await db.execute(select(User).where(User.is_superuser.is_(True)))
     return result.scalars().all()
 
 
