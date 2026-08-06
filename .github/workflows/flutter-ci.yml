@@ -2,25 +2,28 @@ name: Flutter CI
 
 on:
   push:
+    branches: [main]
     paths:
       - 'mobile/**'
   pull_request:
+    branches: [main]
     paths:
       - 'mobile/**'
 
 jobs:
   test-flutter:
-    name: Test Flutter (mobile changes only)
+    name: Test Flutter (mobile only)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.10.5'
-          channel: 'stable'
+      - name: Install Flutter (stable branch)
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git $HOME/flutter
+          echo "$HOME/flutter/bin" >> $GITHUB_PATH
+          export PATH="$HOME/flutter/bin:$PATH"
+          flutter --version
 
       - name: Get dependencies
         working-directory: mobile/egg_guardian

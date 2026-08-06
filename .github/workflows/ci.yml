@@ -76,26 +76,6 @@ jobs:
         working-directory: services/api
         run: ruff check app/
 
-  test-flutter:
-    name: Test Flutter
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.10.5'
-          channel: 'stable'
-
-      - name: Get dependencies
-        working-directory: mobile/egg_guardian
-        run: flutter pub get
-
-      - name: Analyze code
-        working-directory: mobile/egg_guardian
-        run: flutter analyze --no-fatal-infos
 
   docker-build:
     name: Docker Build
