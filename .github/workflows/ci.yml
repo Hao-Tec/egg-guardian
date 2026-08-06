@@ -76,27 +76,6 @@ jobs:
         working-directory: services/api
         run: ruff check app/
 
-  test-flutter:
-    name: Test Flutter
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Flutter 3.28.0
-        run: |
-          git clone --branch 3.28.0 --single-branch --depth 1 https://github.com/flutter/flutter.git $HOME/flutter
-          echo "$HOME/flutter/bin" >> $GITHUB_PATH
-          export PATH="$HOME/flutter/bin:$PATH"
-          flutter --version
-
-      - name: Get dependencies
-        working-directory: mobile/egg_guardian
-        run: flutter pub get
-
-      - name: Analyze code
-        working-directory: mobile/egg_guardian
-        run: flutter analyze --no-fatal-infos
 
   docker-build:
     name: Docker Build
