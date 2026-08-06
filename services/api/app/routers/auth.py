@@ -67,6 +67,14 @@ async def register(
         is_active=is_first_user,  # First user active immediately; others need approval
     )
 
+    # Persist the new user immediately so subsequent requests in tests/other sessions can see it
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    await db.refresh(user)
+
     # If not the first user, notify all admins by email
     if not is_first_user:
         admins = await get_all_admins(db)
