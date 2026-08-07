@@ -45,6 +45,31 @@ async def get_db() -> AsyncSession:
             await session.close()
 
 
+import asyncio
+from sqlalchemy import text
+
+
+async def wait_for_db(retries: int = 6, delay_seconds: int = 5) -> None:
+    """Wait for the database to become available with exponential backoff.
+
+    Raises the last exception if the DB is still unreachable after retries.
+    """
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            async with engine.connect() as conn:
+                # simple lightweight query to verify connectivity
+                await conn.execute(text("SELECT 1"))
+                return
+        except Exception as exc:  # pragma: no cover - environment-specific
+            last_exc = exc
+            backoff = delay_seconds * attempt
+            print(f"Database not available (attempt {attempt}/{retries}): {exc}")
+            await asyncio.sleep(backoff)
+    # All attempts failed
+    raise last_exc
+
+
 async def init_db() -> None:
     """Initialize database tables."""
     # Import models to register them with Base
@@ -55,8 +80,6 @@ async def init_db() -> None:
 
         # Add fcm_token column if it doesn't exist
         try:
-            from sqlalchemy import text
-
             await conn.execute(
                 text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR(255)"
